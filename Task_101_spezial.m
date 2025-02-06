@@ -25,7 +25,7 @@ for i=1:n
 end
 hold on
 
-h = 0.015; % Zeitschritt;
+h = 0.05; % Zeitschritt;
 t_end = h*1e5;
 t = 0;
 x_Nneu = zeros(n,2);
