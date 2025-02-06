@@ -9,3 +9,5 @@ r = norm(x2-x1);
 r_dir = x2 - x1;
 F = G*m_1*m_2/r^3*r_dir; 
 % F = [F_x, F_y];
+
+

@@ -25,11 +25,13 @@ for i=1:n
 end
 hold on
 
-h = 0.01; % Zeitschritt;
+h = 0.015; % Zeitschritt;
 t_end = h*1e5;
 t = 0;
 x_Nneu = zeros(n,2);
 v_Nneu = zeros(n,2);
+x_positions = zeros(n,2,t_end/h);
+iteration = 0;
 
 k_1 = zeros(n,2);
 k_2 = zeros(n,2);
@@ -40,17 +42,13 @@ M = zeros(n,2);
 tic
 while t < t_end
     t = t + h;
+    iteration = iteration + 1;
     for i = 1:n
         k_1(i,:) = (x_N(i,:) + h*(v_N(i,:) + F(i,:)*h*0.5/m_N(i))) - x_N(i,:); % k_1 gleich wie x_N, k_1 = f(x,t)
-        k_2(i,:) = ((x_N(i,:) + 0.5*h*k_1(i,:)) + (0.5*h)*(v_N(i,:) + F(i,:)*(0.5*h)*0.5/m_N(i))) - x_N(i,:); % k_2 = f(x+0.5*h*k_1, t+0.5*h), Position bei halber Schrittweite
+        k_2(i,:) = ((x_N(i,:) + 0.5*h*k_1(i,:)) + (0.5*h)*(v_N(i,:) + F(i,:)*(0.5*h)*0.5/m_N(i))) - x_N(i,:); % k_2 = f(x+0.5*h*k_1, t+0.5*h), Steigung zur Position bei halber Schrittweite
         k_3(i,:) = ((x_N(i,:) + 0.5*h*k_2(i,:)) + (0.5*h)*(v_N(i,:) + F(i,:)*(0.5*h)*0.5/m_N(i))) - x_N(i,:); % k_3 = f(x+0.5*h*k_2, t+0.5*h)
         k_4(i,:) = ((x_N(i,:) + h*k_3(i,:)) + h*(v_N(i,:) + F(i,:)*h*0.5/m_N(i))) - x_N(i,:); % k_4 = f(x+h*k_3, t+h)
-        x_Nneu(i,:) = x_N(i,:) + (1/6)*(k_1(i,:)+2*k_2(i,:)+2*k_3(i,:)+k_4(i,:))*h;
-
-        plot(x_Nneu(i,1), x_Nneu(i,2), C{i}, 'LineWidth', 1);
-        title(['Planetenbewegung']);
-        legend('s = Sonne', 'b = Erde', 'r = Jupiter', 'g = Haley');
-        grid on;
+        x_Nneu(i,:) = x_N(i,:) + (1/6)*(k_1(i,:)+2*k_2(i,:)+2*k_3(i,:)+k_4(i,:));
     end
     F_neu = zeros(n,2);
     for i=1:n
@@ -63,116 +61,24 @@ while t < t_end
     for i=1:n
         v_Nneu(i,:) = v_N(i,:) + 0.5/m_N(i)*(F(i,:) + F_neu(i,:))*h;
     end
+    for i = 1:n
+        x_positions(i, :, iteration) = x_Nneu(i, :);
+    end
     F = F_neu;
     x_N = x_Nneu;
     v_N = v_Nneu;
-%     disp(x_N)
-%     disp(v_N)
-%     disp(F_0)
-%     M(i) = getframe;
+
 end
-% movie(M);
-hold off
+figure;
+hold on;
+for s = 1:iteration
+    for i = 1:n
+        plot(x_positions(i,1,s), x_positions(i,2,s), C{i}, 'LineWidth', 1);
+    end
+end
+title('Planetenbewegung');
+legend('s = Sonne', 'b = Erde', 'r = Jupiter', 'g = Haley');
+grid on;
+
 toc
 
-% h = 0.2; % Zeitschritt;
-% t_end = h;
-% t = 0;
-% x_Nneu = zeros(n,2);
-% v_Nneu = zeros(n,2);
-% 
-% k_1 = zeros(n,2);
-% k_2 = zeros(n,2);
-% k_3 = zeros(n,2);
-% k_4 = zeros(n,2);
-% M = zeros(n,2);
-% 
-% while t < t_end
-%     t = t + h;
-%     for i = 1:n
-%         k_1(i,:) = x_N(i,:) + h*(v_N(i,:) + F(i,:)*h*0.5/m_N(i)); % k_1 gleich wie x_Nneu, k_1 = f(x,t)
-%         k_2(i,:) = (x_N(i,:) + 0.5*h*k_1(i,:)) + (0.5*h)*(v_N(i,:) + F(i,:)*(0.5*h)*0.5/m_N(i)); % k_2 = f(x+0.5*h*k_1, t+0.5*h), Position bei halber Schrittweite
-%         k_3(i,:) = (x_N(i,:) + 0.5*h*k_2(i,:)) + (0.5*h)*(v_N(i,:) + F(i,:)*(0.5*h)*0.5/m_N(i)); % k_3 = f(x+0.5*h*k_2, t+0.5*h)
-%         k_4(i,:) = (x_N(i,:) + h*k_3(i,:)) + h*(v_N(i,:) + F(i,:)*h*0.5/m_N(i)); % k_4 = f(x+h*k_3, t+h)
-%         x_Nneu(i,:) = x_N(i,:) + (1/6)*(k_1(i,:)+2*k_2(i,:)+2*k_3(i,:)+k_4(i,:))*h;
-% 
-%         plot(x_Nneu(i,1), x_Nneu(i,2), C{i}, 'LineWidth', 1);
-%         title(['Planetenbewegung']);
-%         legend('s = Sonne', 'b = Erde', 'r = Jupiter', 'g = Haley');
-%         grid on;
-%     end
-%     F_neu = zeros(n,2);
-%     for i=1:n
-%         for j=1:n
-%             if j~=i
-%                 F_neu(i,:) = F_neu(i,:) + Grav_Pot(x_Nneu(i,:), x_Nneu(j,:), m_N(i), m_N(j));
-%             end
-%         end
-%     end
-%     for i=1:n
-%         v_Nneu(i,:) = v_N(i,:) + 0.5/m_N(i)*(F(i,:) + F_neu(i,:))*h;
-%     end
-% %     F = F_neu;
-% %     x_N = x_Nneu;
-% %     v_N = v_Nneu;
-% %     disp(x_N)
-% %     disp(v_N)
-% %     disp(F_0)
-% %     M(i) = getframe;
-% end
-% % movie(M);
-% hold off
-
-% delta_t = 0.2;
-% t_end = delta_t;
-% t = 0;
-% x_Nneu = zeros(n,2);
-% v_Nneu = zeros(n,2);
-% h = zeros(n,2);
-% k_1 = zeros(n,2);
-% k_2 = zeros(n,2);
-% k_3 = zeros(n,2);
-% k_4 = zeros(n,2);
-% M = zeros(n,2);
-% 
-% while t < t_end
-%     t = t + delta_t;
-%     for i = 1:n
-%         k_1(i,:) = x_N(i,:) + delta_t*(v_N(i,:) + F(i,:)*delta_t*0.5/m_N(i)); % k_1 gleich wie x_Nneu, k_1 = F(x,t)
-%         h(i,:) = (x_N(i,:)-k_1(i,:)); % Abstand von x_N und k_1
-%         for j = 1:2
-%             if h(i,j) < 0
-%                 h(i,j) = -h(i,j);
-%             end
-%         end
-%         k_2(i,:) = (x_N(i,:) + 0.5*h(i,:).*k_1(i,:)) + (delta_t + 0.5*h(i,:)).*(v_N(i,:) + F(i,:).*(delta_t + 0.5*h(i,:))*0.5/m_N(i)); % k_2 = F(x+0.5*h, t+0.5*h*k_1)
-%         k_3(i,:) = (x_N(i,:) + 0.5*h(i,:).*k_2(i,:)) + (delta_t + 0.5*h(i,:)).*(v_N(i,:) + F(i,:).*(delta_t + 0.5*h(i,:))*0.5/m_N(i)); % k_3 = F(x+0.5*h*k_2, t+0.5*h)
-%         k_4(i,:) = (x_N(i,:) + h(i,:).*k_3(i,:)) + (delta_t*h(i,:)).*(v_N(i,:) + F(i,:).*(delta_t*h(i,:))*0.5/m_N(i)); % k_4 = F(x+h*k_3, t+h)
-%         x_Nneu(i,:) = x_N(i,:) + (1/6)*(k_1(i,:)+2*k_2(i,:)+2*k_3(i,:)+k_4(i,:)).*h(i,:);
-% 
-%         plot(x_Nneu(i,1), x_Nneu(i,2), C{i}, 'LineWidth', 1);
-%         title(['Planetenbewegung']);
-%         legend('s = Sonne', 'b = Erde', 'r = Jupiter', 'g = Haley');
-%         grid on;
-%     end
-%     F_neu = zeros(n,2);
-%     for i=1:n
-%         for j=1:n
-%             if j~=i
-%                 F_neu(i,:) = F_neu(i,:) + Grav_Pot(x_Nneu(i,:), x_Nneu(j,:), m_N(i), m_N(j));
-%             end
-%         end
-%     end
-%     for i=1:n
-%         v_Nneu(i,:) = v_N(i,:) + 0.5/m_N(i)*(F(i,:) + F_neu(i,:))*delta_t;
-%     end
-% %     F = F_neu;
-% %     x_N = x_Nneu;
-% %     v_N = v_Nneu;
-% % %     disp(x_N)
-% % %     disp(v_N)
-% % %     disp(F_0)
-% %     M(i) = getframe;
-% end
-% % movie(M);
-% hold off
