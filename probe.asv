@@ -32,16 +32,20 @@ end
 hold on
 
 delta_t = 0.2;
-t_end = delta_t*10;
+t_end = delta_t*3;
 t = 0;
 x_Nneu = zeros(n,2);
 v_Nneu = zeros(n,2);
+M_x = zeros(n, int32(t_end/delta_t))
+M_y = zeros(n, int32(t_end/delta_t))
 tic
 while t < t_end
     t_start = tic;
     t = t + delta_t;
     for i = 1:n
         x_Nneu(i,:) = x_N(i,:) + delta_t*(v_N(i,:) + F(i,:)*delta_t*0.5/m_N(i));
+        M_x(i,:) = x_Nneu(i,1)
+        M_y(i,:) = x_Nneu(i,2)
 %         plot(x_Nneu(i,1), x_Nneu(i,2), C{i}, 'LineWidth', 1);
 %         title(['Planetenbewegung']);
 %         legend('s = Sonne', 'b = Erde', 'r = Jupiter', 'g = Haley');
@@ -58,10 +62,6 @@ while t < t_end
     for i=1:n
         v_Nneu(i,:) = v_N(i,:) + 0.5/m_N(i)*(F(i,:) + F_neu(i,:))*delta_t;
     end
-    plot(x_Nneu(:,1), x_Nneu(:,2), C{i}, 'LineWidth', 1);
-    title(['Planetenbewegung']);
-    legend('s = Sonne', 'b = Erde', 'r = Jupiter', 'g = Haley');
-    grid on;
     F = F_neu;
     x_N = x_Nneu;
     v_N = v_Nneu;
