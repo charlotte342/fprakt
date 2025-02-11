@@ -1,5 +1,5 @@
 tic
-% Anfangsbedingungen (2D)
+%Anfangsbedingungen (2D)
 
 x_N = [0, 0; 0, 1; 0, 5.36; 34.75, 0]; % Ort
 v_N = [0, 0; -1, 0; -0.425, 0; 0, 0.0296]; % Geschwindigkeit
@@ -12,6 +12,16 @@ n = length(x_N);
 % Berechnung der Ausgangskräfte
 F = Grav_Pot_vektorisiert(x_N,m_N);
 
+% F = zeros(n,2);
+% tic
+% for i=1:n
+%     for j=1:n
+%         if j~=i
+%             F(i,:) = F(i,:) + Grav_Pot(x_N(i,:), x_N(j,:), m_N(i), m_N(j));  
+%         end
+%     end
+% end
+% 
 figure;
 C = {'k*:','b*:','r*:','g*:'};
 for i=1:n
@@ -21,20 +31,31 @@ end
 hold on
 
 delta_t = 0.1;
-t_end = delta_t*1000;
+t_end = delta_t*100;
 j = t_end/delta_t;
 t = 0;
 x_positions = zeros(n,2,j);
+x_Nneu = zeros(n,2);
+v_Nneu = zeros(n,2);
 iteration = 0;
 
 while t < t_end
     t = t + delta_t;
     iteration = iteration + 1;
-    x_N = x_N + delta_t*(v_N + F.*delta_t*0.5./m_N);
-    F_neu = Grav_Pot_vektorisiert(x_N, m_N);
-    v_N  = v_N + bsxfun(@rdivide, (F+F_neu), 2*m_N)*delta_t;
-    x_positions(:, :, iteration) = x_N;
+    x_Nneu(:,:) = x_N(:,:) + delta_t*(v_N(:,:) + F(:,:).*delta_t*0.5./m_N);
+    F_neu = Grav_Pot_vektorisiert(x_Nneu, m_N);
+%         for j=1:n
+%             if j~=i
+%                 F_neu(i,:) = F_neu(i,:) + Grav_Pot(x_Nneu(i,:), x_Nneu(j,:), m_N(i), m_N(j));
+%             end
+%         end
+%     end
+    v_Nneu(:,:) = v_N(:,:) + bsxfun(@rdivide, (F+F_neu), 2*m_N)*delta_t;
+    x_positions(:, :, iteration) = x_Nneu(:, :);
     F = F_neu;
+    x_N = x_Nneu;
+    v_N = v_Nneu;
+
 end
 
 for s = 1:iteration
@@ -56,13 +77,14 @@ n = length(x);
 F_neu = zeros(n,2,n);
 r = zeros(n,2,n);
 F_total = zeros(n,2);
-r_betrag = zeros(n,1,n);
+r_betrag = zeros(n,2);
 for i=1:n
-    r(:,:,i) = bsxfun(@minus, x(i,:), x);
+%     F_neu = zeros(n,2,i);
+    r(:,:,i) = bsxfun(@minus, x, x(i,:));
     for j=1:n
-        r_betrag(j,1,i) = norm(r(j,:,i));
+        r_betrag(j,:) = norm(sum(r(j,:,i), 2))
     end
-    F_neu(:,:,i) = bsxfun(@times, [1*m(i)*m./(r_betrag(:,:,i).^3)], r(:,:,i));
+    F_neu(:,:,i) = bsxfun(@times, [1*m(i)*m./(r_betrag.^3)], r(:,:,i));
     F = F_neu;
     F(isnan(F_neu)) = 0;
 end

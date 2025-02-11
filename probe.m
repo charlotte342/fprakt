@@ -175,7 +175,7 @@ while t < t_end
             end
         end
     end
-    F_neu = [sum(F_x,2), sum(F_y,2)]
+    F_neu = [sum(F_xneu,2), sum(F_yneu,2)]
     for i=1:n
         v_Nneu(i,:) = v_N(i,:) + 0.5/m_N(i)*(F_0(i,:) + F_neu(i,:))*delta_t;
     end

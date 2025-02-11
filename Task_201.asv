@@ -23,36 +23,27 @@ xlabel('r / nm'); ylabel('E/k_B /K'); grid on;
 %% LJ-Gradient für ein Atom
 
 x_N = [5,5]
-x = 0:1:10;
-y = 0:1:10;
+spacing = 1;
+x = 0:0.1:10;
+y = 0:0.1:10;
 [X,Y] = meshgrid(x,y);
-F_x = zeros(length(X), length(X));
-F_y = zeros(length(Y), length(Y));
+% F_x = zeros(length(X), length(X));
+% F_y = zeros(length(Y), length(Y));
 % U = zeros(length(X));
 % V = zeros(length(Y));
 
 F_x(:,:) = LJ_Grad(E, sigma, X(:,:), x_N(1,1));
 F_y(:,:) = LJ_Grad(E, sigma, Y(:,:), x_N(1,2));
+%     F_y = 24.*E/((y.').^2).*(sigma/y.').^6.*(1-2*(sigma/y.').^6);
 
-% r_x(:,:) = X(:,:) - x_N(1,1)
-% if r_x(:,:) ~= 0
-%     Z_x(:,:) = a*E*((sigma./r_x(:,:)).^n-(sigma./r_x(:,:)).^m);
-% else
-%     Z_x = 0;
-% end
-% r_y(:,:) = Y(:,:) - x_N(1,2)
-% if r_y(:,:) ~= 0
-%     Z_y(:,:) = 0;
-% else
-%     Z_y = a*E*((sigma./r_y(:,:)).^n-(sigma./r_y(:,:)).^m);
-% end
-% 
-% Z = Z_x + Z_y;
-Z = F_x + F_y
+U(:,:) = sum(F_x, 3);
+V(:,:) = sum(F_y, 3);
+Z = norm(U(:,:)-V(:,:))
+
 figure;
-quiver(X,Y,F_x,F_y);
+quiver(X,Y,U,V);
 hold on
-contour(X,Y,Z)
+fcontour(Z)
 axis equal; grid on
 hold off
 
@@ -77,19 +68,17 @@ for i=1:length(x_N)
     F_x(:,:,i) = LJ_Grad(E, sigma, X(:,:), x_N(i,1));
     F_y(:,:,i) = LJ_Grad(E, sigma, Y(:,:), x_N(i,2));
 %     F_y = 24.*E/((y.').^2).*(sigma/y.').^6.*(1-2*(sigma/y.').^6);
-%     quiver(X,Y,F_x(:,:,i), F_y(:,:,i), 'LineWidth', 2);
+%     quiver(X,Y,F_x(:,:,i), F_y(:,:,i));
 %     hold on
 
 end
 U(:,:) = sum(F_x, 3);
 V(:,:) = sum(F_y, 3);
 
-Z = U + V
-
 for i = 1:length(x_N)
-    r_x(:,:,i) = X(:,:) - x_N(i,1);
+    r_x(:,:,i) = X(:,:) - x_N(i,1)
     Z_x = a*E*((sigma./r_x(:,:,i)).^n-(sigma./r_x(:,:,i)).^m);
-    r_y(:,:,i) = Y(:,:) - x_N(i,2);
+    r_y(:,:,i) = Y(:,:) - x_N(i,2)
     Z_y = a*E*((sigma./r_y(:,:,i)).^n-(sigma./r_y(:,:,i)).^m);
 end
 
