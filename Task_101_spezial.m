@@ -25,8 +25,8 @@ for i=1:n
 end
 hold on
 
-h = 0.015; % Zeitschritt;
-t_end = h*10000;
+h = 0.1; % Zeitschritt;
+t_end = h*1000;
 t = 0;
 x_Nneu = zeros(n,2);
 v_Nneu = zeros(n,2);
@@ -37,13 +37,13 @@ k_1 = zeros(n,2);
 k_2 = zeros(n,2);
 k_3 = zeros(n,2);
 k_4 = zeros(n,2);
-M = zeros(n,2);
 
 tic
 while t < t_end
     t = t + h;
     iteration = iteration + 1;  
-    %     Berechnung der vier Zwischenschritte
+    %     Berechnung der vier Zwischenschritte mit F = m*a, v = F/m*h und
+    %     x= v*h
     k1_v = h*F./m_N;
     k1_x = h*v_N;
     F1 = zeros(n,2);

@@ -15,7 +15,7 @@ F = LJ_Kraft(Positions, sigma, E);
 
 t = 0;
 delta_t = 0.1;
-t_end = delta_t*50;
+t_end = delta_t*3;
 iteration = 1;
 iteration_total = t_end/delta_t;
 
@@ -63,6 +63,9 @@ while t < t_end
     F = F_neu;
 end
 movie(M)
+
+% Output als xyz-file
+writematrix('202.xyz', [xy_positions(:,1), xy_positions(:,2), 0], 'Delimeter', '\t')
 %% Funktionen
 
 function F_total = LJ_Kraft(x, sigma, E)
