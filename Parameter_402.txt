@@ -1,0 +1,16 @@
+Integrator: Runge-Kutta
+Order: 4
+
+dt: 0.001
+n_steps: 1e4
+
+Force-Field: Lennard-Jones
+alpha: 4.0
+sigma: 1.0
+E: 1
+Atomtyp: Ar
+Masse: 1.0
+
+Coulomb
+q_i
+q_j

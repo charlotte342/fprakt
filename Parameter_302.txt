@@ -1,0 +1,11 @@
+Integrator: Velocity-Verlet
+
+dt: 41.32
+n_steps: 1e4
+
+Force-Field: Lennard-Jones
+alpha: 4.0
+sigma: 6.4345
+E: 3.7973e-4
+Atomtyp: Ar
+Masse: 72820.75
