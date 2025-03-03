@@ -95,7 +95,7 @@ xyz = bsxfun(@minus, bsxfun(@times, xyz_0, d), 0.5*d); % Zufallszahlen im Interv
 % r_min implementieren
 for i = 1:n
     r(:,:,i) = bsxfun(@minus, xyz, xyz(i,:));
-    r(:,:,i) = r(:,:,i) - .5*d.* round(r(:,:,i)./d); % PBC: wenn Abstand zu Teilchen in nächster Box kürzer
+    r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d); % PBC: wenn Abstand zu Teilchen in nächster Box kürzer
 end
 for i = 1:n
     for j = i:n
