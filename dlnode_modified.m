@@ -1,9 +1,12 @@
-classdef Molekueldynamik
-    % coordinates, velocities...
-
+% Matlab Class code dlnode for the implementation of linked lists
+classdef dlnode_modified < handle
+    % handle: superclass of all handle classes (object, that indirectly
+    % references its data)
+    % dlnode A class to represent a doubly - linked node .
+    % Link multiple dlnode objects together to create linked lists .
     properties
         coordinates_0
-%         velocities_0
+        %         velocities_0
         a
         sigma
         E
@@ -20,20 +23,24 @@ classdef Molekueldynamik
         temperature
         energy
         E_pot
-        E_pot_all 
+        E_pot_all
         E_kin_all
         n
         t_end
         F % Force
-%         T_all % Gesamttemperatur
-%         E_kin_all % kinetische Energie, alle Schritte
+        %         T_all % Gesamttemperatur
+        %         E_kin_all % kinetische Energie, alle Schritte
     end
     properties (Constant, Hidden)
         k_B = 3.1651e-06;
     end
+    properties ( SetAccess = private )
+        Next = dlnode_modified . empty
+        Prev = dlnode_modified . empty
+    end
     methods
         % initialize, propagate...
-        function obj=Molekueldynamik(coordinates_0, a, sigma, E, m, t, delta_t, n_steps, tau, T_0) % heißt wie Klasse
+        function obj=dlnode(coordinates_0, a, sigma, E, m, t, delta_t, n_steps, tau, T_0) % heißt wie Klasse
             % Input
             obj.a=a;
             obj.sigma=sigma;
@@ -46,17 +53,17 @@ classdef Molekueldynamik
             obj.tau = tau;
             obj.T_0 = T_0;
         end
-      
+
         function n=get.n(obj)
-%             n=size(obj.coordinates_0,1);
+            %             n=size(obj.coordinates_0,1);
             n = size(obj.coordinates_0,1);
         end
         function t_end = get.t_end(obj)
             t_end = obj.delta_t*obj.n_steps;
         end
-%         function velocities_0=get.velocities_0(obj)
-%             velocities_0=zeros(size(obj.coordinates_0,1), size(obj.coordinates_0,2));
-%         end
+        %         function velocities_0=get.velocities_0(obj)
+        %             velocities_0=zeros(size(obj.coordinates_0,1), size(obj.coordinates_0,2));
+        %         end
 
         function F = get.F(obj)
             % Berechnung der Kräfte
@@ -102,12 +109,12 @@ classdef Molekueldynamik
         end
 
 
-        function result = VelocityVerlet(obj)
+        function result = Zeitintegration(obj)
 
             % Velocity-Verlet-Propagator
             result.coordinates = zeros(length(obj.coordinates_0), 3, obj.n_steps);
             result.coordinates(:,:,1) = obj.coordinates_0;
-%             obj.E_all = zeros(obj.n_steps, 1);
+            %             obj.E_all = zeros(obj.n_steps, 1);
             result.energy = zeros(obj.n_steps,1);
             result.E_kin_all = zeros(obj.n_steps,1);
             result.E_pot_all = zeros(obj.n_steps,1);
@@ -157,74 +164,74 @@ classdef Molekueldynamik
                 velocities_0 = new_velocities;
                 result.coordinates(:,:,iteration) = xyz;
             end
-            figure;
-            plot(result.temperature, '-b', 'LineWidth', 2);
-            title('Temperaturverlauf');
-            xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
-            figure;
-            plot(result.energy, '-g', 'LineWidth', 2);
-            hold on
-            plot(result.E_kin_all, '-b','LineWidth',2);
-            hold on
-            plot(result.E_pot_all, '-r', 'LineWidth', 2);
-            title('Energie des Systems');
-            xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
-            legend('Gesamtenergie', 'kinetische Energie', 'potentielle Energie');
-
-%             v = VideoWriter('Video.avi');
-%             open(v);
-%             figure;
-%             for i = 1:obj.n_steps
-%                 %     xyz_i = xyz_all(:, :, i);
-%                 clf;
-%                 plot3(result.coordinates(:, 1, i), result.coordinates(:, 2, i), result.coordinates(:, 3, i), 'o', 'MarkerSize', 6);
-%                 title('Moleküldynamik');
-%                 xlabel('X'); ylabel('Y'); zlabel('Z'); grid on;
-%                 M = getframe(gcf);
-%                 writeVideo(v, M);
-%             end
-%             close(v);
         end
- 
-%             figure
-%             plot(result.temperature, '-b', 'LineWidth', 2);
-%             title('Temperaturverlauf');
-%             xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
-%             figure;
-%             plot(result.energy, '-b','LineWidth',2);
-%             title('Energie');
-%             xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
-       
-        
-        function plot_data(obj)
-            figure;
-            plot(obj.temperature, '-b', 'LineWidth', 2);
-            title('Temperaturverlauf');
-            xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
-            figure;
-            plot(result.energy, '-b','LineWidth',2);
-            title('Energie');
-            xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
-        end
+    end
 
-
-        function Visualisierung(obj)
-            % Visualisierung in matlab mithilfe von VideoWriter
-            v = VideoWriter('Video.avi');
-            open(v);
-            figure;
-            for i = 1:obj.n_steps
-                %     xyz_i = xyz_all(:, :, i);
-                clf;
-                plot3(obj.coordinates(:, 1, i), xyz_all(:, 2, i), xyz_all(:, 3, i), 'o', 'MarkerSize', 6);
-                title('Moleküldynamik');
-                xlabel('X'); ylabel('Y'); zlabel('Z'); grid on;
-                M = getframe(gcf);
-                writeVideo(v, M);
+    methods
+        function node = dlnode ( Data )
+            % Construct a dlnode object
+            if nargin > 0
+                node . Data = Data ;
             end
-            close(v);
-end
-
-
+        end
+        function insertAfter ( newNode , nodeBefore )
+            % Insert newNode after nodeBefore .
+            removeNode ( newNode ) ;
+            newNode . Next = nodeBefore . Next ;
+            newNode . Prev = nodeBefore ;
+            if ~ isempty ( nodeBefore . Next )
+                nodeBefore . Next . Prev = newNode ;
+            end
+            nodeBefore . Next = newNode ;
+        end
+        function insertBefore ( newNode , nodeAfter )
+            % Insert newNode before nodeAfter .
+            removeNode ( newNode ) ;
+            newNode . Next = nodeAfter ;
+            newNode . Prev = nodeAfter . Prev ;
+            if ~ isempty ( nodeAfter . Prev )
+                nodeAfter . Prev . Next = newNode ;
+            end
+            nodeAfter . Prev = newNode ;
+        end
+        function removeNode ( node )
+            % Remove a node from a linked list .
+            if ~ isscalar ( node )
+                error ( ' Input must be scalar ')
+                20
+            end
+            prevNode = node . Prev ;
+            nextNode = node . Next ;
+            if ~ isempty ( prevNode )
+                prevNode . Next = nextNode ;
+            end
+            if ~ isempty ( nextNode )
+                nextNode . Prev = prevNode ;
+            end
+            node . Next = dlnode_modified . empty ;
+            node . Prev = dlnode_modified . empty ;
+        end
+        function clearList ( node )
+            % Clear the list before
+            % clearing list variable
+            prev = node . Prev ;
+            next = node . Next ;
+            removeNode ( node )
+            while ~ isempty ( next )
+                node = next ;
+                next = node . Next ;
+                removeNode ( node ) ;
+            end
+            while ~ isempty ( prev )
+                node = prev ;
+                prev = node . Prev ;
+                removeNode ( node )
+            end
+        end
+    end
+    methods ( Access = private )
+        function delete ( node )
+            clearList ( node )
+        end
     end
 end

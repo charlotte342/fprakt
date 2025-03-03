@@ -8,18 +8,17 @@ tic
 % Boxmaßen d_x,y,z = 30
 
 % Parameter importieren
-% [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_302.txt');
-% % n_steps = 1000;
-% % delta_t = 100;
-% 
-% % Teilchen in Box
-% [xyz, v, d] = Initialisierung_PBC(30, 30, 30, 10, sigma);
-% 
-% tau = 41.32*1e3;
-% T_0 = 50; % Zieltemperatur, 50 K
-% xyz_0 = Molekueldynamik(xyz, a, sigma, E, m, t, delta_t, n_steps, tau, T_0);
-% 
-% struct = xyz_0.Zeitintegration;
+[a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_302.txt');
+n_steps = 1000;
+
+% Teilchen in Box
+[xyz, v, d] = Initialisierung_PBC(30, 30, 30, 10, sigma);
+
+tau = 41.32*1e3;
+T_0 = 50; % Zieltemperatur, 50 K
+xyz_0 = Molekueldynamik(xyz, a, sigma, E, m, t, delta_t, n_steps, tau, T_0);
+
+Zeitintegration = xyz_0.VelocityVerlet;
 
 
 
@@ -31,7 +30,7 @@ tic
 
 
 % % Visualisierung als Film in matlab oder output als xyz Datei für vmd
-Visualisierung(A.coordinates, 'Film.avi')
+% Visualisierung(A.coordinates, 'Film.avi')
 % Generate_xyz(xyz_all, 'Box.xyz')
 
 toc

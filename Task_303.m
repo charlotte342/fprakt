@@ -13,9 +13,60 @@ tic
 
 % Parameter importieren
 [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_302.txt');
+n_steps = 2;
+delta_t = delta_t/2;
 
 % Teilchen in Box
-[xyz, v, d, np_Teilchen] = Initialisierung_PBC(30, 30, 30, 10, sigma);
+% [xyz, v, d, np_Teilchen] = Initialisierung_PBC(30, 30, 30, 10, sigma);
+
+d = [30,30,30];
+np_Teilchen = 30;
+
+% Initialisierung
+% zentrierte Box
+% d = [d_x, d_y, d_z];
+% np zufällig verteilte Punkt-Teilchen in den Grenzen der Box
+
+r = zeros(np_Teilchen,3,np_Teilchen);
+r_betrag = zeros(np_Teilchen,1,np_Teilchen);
+% Initialisierte Zufallszahlen mit 1239465719 für Vergleichbarkeit mit rng
+% rng(1239465719);
+xyz_0 = rand (np_Teilchen, 3); % rand: Zufallszahlen zwischen 0 und 1
+n = length(xyz_0);
+xyz = bsxfun(@minus, bsxfun(@times, xyz_0, d), 0.5*d); % Zufallszahlen im Intervall von d
+
+% r_min implementieren
+for i = 1:n
+    r(:,:,i) = bsxfun(@minus, xyz, xyz(i,:));
+    r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d); % PBC: wenn Abstand zu Teilchen in nächster Box kürzer
+end
+for i = 1:n
+    for j = i:n
+        r_betrag(j,1,i) = norm(r(j,:,i));
+        r_betrag(i,1,j) = r_betrag(j,1,i);
+        r_betrag(j,1,j) = sigma;
+        while r_betrag(j,1,i) < sigma
+            xyz_0(j,:) = rand(1,3);
+            xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
+            r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
+            r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
+            r_betrag(j,1,i) = norm(r(j,:,i));
+            r_betrag(i,1,j) = r_betrag(j,1,i);
+        end
+    end
+end     
+for i = 1:n
+    for j = i:n
+        while r_betrag(j,1,i) < sigma
+            xyz_0(j,:) = rand(1,3);
+            xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
+            r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
+            r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
+            r_betrag(j,1,i) = norm(r(j,:,i));
+        end
+    end
+end
+v = zeros(n,3);
 
 % Kraftberechnung - z. B. LJ_Kraft oder Coulomb ...
 F = LJ_Kraft(xyz, sigma, E, d);
@@ -23,9 +74,13 @@ F = LJ_Kraft(xyz, sigma, E, d);
 % % Zeitintegration - z. B. Velocity-Verlet
 [xyz_all, v, E_kin_all, E_pot_all, E_tot, T_all] = Zeitintegration(xyz, t, delta_t, F, n_steps, v, m, sigma, E, d, np_Teilchen, a, delta_t*1e3); % letzte ist tau fürs Thermostat
 
+%%
+Visualisierung(xyz, 'Film.avi')
+%%
 
 % Visualisierung als Film in matlab oder output als xyz Datei für vmd
-% Visualisierung(xyz_all, 'Film.avi')
+Visualisierung(xyz_all, 'Film.avi')
+%%
 Generate_xyz(xyz_all, 'Thermostat.xyz')
 
 figure;
@@ -185,7 +240,7 @@ while t < delta_t*n_steps
         end
     end
     F_neu = LJ_Kraft(xyz, sigma, E, d);
-    E_pot = sum(LJ_Pot(xyz, sigma, E, a, d));
+    E_pot = sum(LJ_Pot(xyz, sigma, E, a, d))*0.5; % Korrektur: *0.5, da i~=j
 
     % Temperaturkontrolle über Skalierung der Geschwindigkeiten mithilfe
     % des Skalierungsfaktors lambda
@@ -193,7 +248,7 @@ while t < delta_t*n_steps
     for i = 1:size(xyz,1)
         v_Betrag(i,1) = norm(v(i,:));
     end
-    E_kin = sum(.5*m*(v_Betrag.^2));
+    E_kin = sum(.5*m*(v_Betrag.^2))*0.5; % Korrektur: *0.5, da i~=j
     T = 2*E_kin./(3*np_Teilchen*k_B);
     lambda = sqrt(1+delta_t/tau*((T_0./T)-1));
     v = v.*lambda;
