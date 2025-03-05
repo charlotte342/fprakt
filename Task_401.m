@@ -9,7 +9,7 @@ tic
 
 % Parameter importieren
 [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_302.txt');
-n_steps = 1000;
+n_steps = 1e5;
 
 % Teilchen in Box
 [xyz, v, d] = Initialisierung_PBC(30, 30, 30, 10, sigma);
@@ -17,10 +17,8 @@ n_steps = 1000;
 tau = 41.32*1e3;
 T_0 = 50; % Zieltemperatur, 50 K
 xyz_0 = Molekueldynamik(xyz, a, sigma, E, m, t, delta_t, n_steps, tau, T_0);
-
+%%
 Zeitintegration = xyz_0.VelocityVerlet;
-
-
 
 % Kraftberechnung - z. B. LJ_Kraft oder Coulomb ...
 % F_0 = LJ_Kraft(xyz, sigma, E, d);

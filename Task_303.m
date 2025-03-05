@@ -13,60 +13,10 @@ tic
 
 % Parameter importieren
 [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_302.txt');
-n_steps = 2;
-delta_t = delta_t/2;
+n_steps = 1e5;
 
 % Teilchen in Box
-% [xyz, v, d, np_Teilchen] = Initialisierung_PBC(30, 30, 30, 10, sigma);
-
-d = [30,30,30];
-np_Teilchen = 30;
-
-% Initialisierung
-% zentrierte Box
-% d = [d_x, d_y, d_z];
-% np zufällig verteilte Punkt-Teilchen in den Grenzen der Box
-
-r = zeros(np_Teilchen,3,np_Teilchen);
-r_betrag = zeros(np_Teilchen,1,np_Teilchen);
-% Initialisierte Zufallszahlen mit 1239465719 für Vergleichbarkeit mit rng
-% rng(1239465719);
-xyz_0 = rand (np_Teilchen, 3); % rand: Zufallszahlen zwischen 0 und 1
-n = length(xyz_0);
-xyz = bsxfun(@minus, bsxfun(@times, xyz_0, d), 0.5*d); % Zufallszahlen im Intervall von d
-
-% r_min implementieren
-for i = 1:n
-    r(:,:,i) = bsxfun(@minus, xyz, xyz(i,:));
-    r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d); % PBC: wenn Abstand zu Teilchen in nächster Box kürzer
-end
-for i = 1:n
-    for j = i:n
-        r_betrag(j,1,i) = norm(r(j,:,i));
-        r_betrag(i,1,j) = r_betrag(j,1,i);
-        r_betrag(j,1,j) = sigma;
-        while r_betrag(j,1,i) < sigma
-            xyz_0(j,:) = rand(1,3);
-            xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
-            r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
-            r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
-            r_betrag(j,1,i) = norm(r(j,:,i));
-            r_betrag(i,1,j) = r_betrag(j,1,i);
-        end
-    end
-end     
-for i = 1:n
-    for j = i:n
-        while r_betrag(j,1,i) < sigma
-            xyz_0(j,:) = rand(1,3);
-            xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
-            r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
-            r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
-            r_betrag(j,1,i) = norm(r(j,:,i));
-        end
-    end
-end
-v = zeros(n,3);
+[xyz, v, d, np_Teilchen] = Initialisierung_PBC(30, 30, 30, 10, sigma);
 
 % Kraftberechnung - z. B. LJ_Kraft oder Coulomb ...
 F = LJ_Kraft(xyz, sigma, E, d);
@@ -79,19 +29,23 @@ Visualisierung(xyz, 'Film.avi')
 %%
 
 % Visualisierung als Film in matlab oder output als xyz Datei für vmd
-Visualisierung(xyz_all, 'Film.avi')
+Visualisierung(xyz_all(:,:,1:20), 'Film.avi')
 %%
 Generate_xyz(xyz_all, 'Thermostat.xyz')
 
 figure;
 plot(T_all, '-b', 'LineWidth', 2);
-axis equal; grid on;
-
+title('Temperaturverlauf');
+xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
 figure;
+plot(E_tot, '-g', 'LineWidth', 2);
+hold on
 plot(E_kin_all, '-b','LineWidth',2);
 hold on
 plot(E_pot_all, '-r', 'LineWidth', 2);
-grid on;
+title('Energie des Systems');
+xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
+legend('Gesamtenergie', 'kinetische Energie', 'potentielle Energie');
 
 toc
 %% Funktionen
@@ -161,11 +115,24 @@ for i = 1:n
             xyz_0(j,:) = rand(1,3);
             xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
             r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
+            r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
             r_betrag(j,1,i) = norm(r(j,:,i));
+            r_betrag(i,1,j) = r_betrag(j,1,i);
         end
     end
 end     
-v = zeros(size(xyz, 1), 3);
+for i = 1:n
+    for j = i:n
+        while r_betrag(j,1,i) < sigma
+            xyz_0(j,:) = rand(1,3);
+            xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
+            r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
+            r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
+            r_betrag(j,1,i) = norm(r(j,:,i));
+        end
+    end
+end
+v = zeros(n,3);
 end
 
 

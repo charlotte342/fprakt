@@ -69,11 +69,10 @@ classdef Molekueldynamik
             for i=1:obj.n
                 r(:,:,i) = bsxfun(@minus, obj.coordinates_0(i,:), obj.coordinates_0);
                 r(:,:,i) = r(:,:,i) - d.*round(r(:,:,i)./d);
-                for j=i:obj.n
-                    r_betrag(j,1,i) = norm(r(j,:,i));
-                    r_betrag(i,1,j) = r_betrag(j,1,i);
-                end
-                F_neu(:,:,i) = bsxfun(@times, (24*obj.E./(r_betrag(:,:,i).^2).*(obj.sigma./r_betrag(:,:,i)).^6.*(1-2*(obj.sigma./r_betrag(:,:,i)).^6)), r(:,:,i));
+
+                % neu: direkte Berechnung der Kraft ohne Betrag und
+                % norm-Funktion
+                F_neu(:,:,i) = bsxfun(@times, (24*obj.E./sum(r(:,:,i).^2, 2).*obj.sigma^6./((sum(r(:,:,i).^2, 2)).^3).*(1-2*(obj.sigma^6./(sum(r(:,:,i).^2,2).^3)))), r(:,:,i));
                 F_korr = F_neu;
                 F_korr(isnan(F_neu)) = 0;
             end
@@ -83,18 +82,15 @@ classdef Molekueldynamik
         function E_pot = get.E_pot(obj)
             E_pot_iteration = zeros(obj.n,1,obj.n);
             r = zeros(obj.n,3,obj.n);
-            r_betrag = zeros(obj.n,1,obj.n);
             E_pot= zeros(obj.n,1);
             d = [30,30,30];
 
             for i=1:obj.n
                 r(:,:,i) = bsxfun(@minus, obj.coordinates_0(i,:), obj.coordinates_0);
                 r(:,:,i) = r(:,:,i) - d.*round(r(:,:,i)./d);
-                for j=i:obj.n
-                    r_betrag(j,1,i) = norm(r(j,:,i));
-                    r_betrag(i,1,j) = r_betrag(j,1,i);
-                end
-                E_pot_iteration(:,:,i) = obj.a*obj.E*((obj.sigma./r_betrag(:,:,i)).^6-(obj.sigma./r_betrag(:,:,i)).^12);
+
+                % neu: Energien auch direkt aus r berechnet
+                E_pot_iteration(:,:,i) = obj.a*obj.E*(((obj.sigma.^6)./(sum(r(:,:,i).^2,2).^3))-((obj.sigma.^12)./((sum(r(:,:,i).^2,2).^6))));
                 E_korr = E_pot_iteration;
                 E_korr(isnan(E_pot_iteration)) = 0; % Korrektur für i = j
             end
@@ -107,7 +103,6 @@ classdef Molekueldynamik
             % Velocity-Verlet-Propagator
             result.coordinates = zeros(length(obj.coordinates_0), 3, obj.n_steps);
             result.coordinates(:,:,1) = obj.coordinates_0;
-%             obj.E_all = zeros(obj.n_steps, 1);
             result.energy = zeros(obj.n_steps,1);
             result.E_kin_all = zeros(obj.n_steps,1);
             result.E_pot_all = zeros(obj.n_steps,1);
@@ -142,15 +137,16 @@ classdef Molekueldynamik
                 for i = 1:size(xyz,1)
                     v_Betrag(i,1) = norm(new_velocities(i,:));
                 end
-                E_kin = sum(.5*obj.m*(v_Betrag.^2));
+                E_kin = sum(.5*obj.m*(v_Betrag.^2)) * 0.5;
+                E_pot = sum(obj.E_pot(:,:)) * 0.5;
                 T = 2*E_kin./(3*10*obj.k_B);
                 lambda = sqrt(1+obj.delta_t/obj.tau*((obj.T_0./T)-1));
                 new_velocities = new_velocities.*lambda;
                 obj.coordinates_0 = xyz; % Koordinaten aktualisieren für die korrekte Berechnung der potentiellen Energie
 
-                result.E_pot_all(iteration,1) = sum(obj.E_pot(:,:));
+                result.E_pot_all(iteration,1) = E_pot;
                 result.E_kin_all(iteration,1) = E_kin;
-                result.energy(iteration,1) = E_kin + sum(obj.E_pot(:,:));
+                result.energy(iteration,1) = E_kin + sum(obj.E_pot(:,:))*0.5;
 
                 result.temperature(iteration,1) = T(:,:);
                 result.velocities(:,:,iteration) = velocities_0;

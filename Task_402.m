@@ -20,82 +20,50 @@ E = repmat(1, np_Teilchen, 1);
 % Zellen erstellen --> Array of linked lists
 % Zellen einteilen/definieren: Simulationsdomäne ist das Teilchengitter
 % (10*1.5*sigma x 10*1.5*sigma), cell structure via meshgrid
-% n_cells = 9; % in 2D
-% N_cell_x = 3;
-% N_cell_y = 3;
-% Cell = zeros(n_cells, 1);
-% 
-N_x = 0 : 2.5*sigma : 2.5*sigma*3;
-N_y = 0 : 2.5*sigma : 2.5*sigma*3;
 
-[X,Y] = meshgrid(N_x,N_y);
-Cell_coordinates = [X(:), Y(:)];
-
-% When using the LC algorithm, using a 1D index representation as cell identifiers instead of
-% coordinates can be beneficial. The purpose is to efficiently store and access elements in a
-% multi-dimensional grid using a one-dimensional data structure like an array.
-% Having a 3D Cartesian grid with dimensions dimx × dimy × dimz , where dimx, dimy,
-% dimz represent the number of cells along the x, y, and z-axis, respectively, the bijective
-% mapping f from the 3D grid coordinates x, y, z of a cell to a unique 1D index is given by:
-
-% 1D index representation as cell identifiers: f = x ∗ (dimx)^2 + y ∗ dimy + z 
-% Cell = Cell_coordinates(:,1) * 3^3 + Cell_coordinates(:,2) * 3;
-
+% [X,Y] = meshgrid(N_x,N_y);
+% Cell_coordinates = [X(:), Y(:)];
 
 % Datenstruktur für jedes Teilchen N --> aus Unterklasse, die dann verlinkt
 % werden in Zellen
 C = zeros(np_Teilchen, 2);
+N_all = Molekueldynamik(coordinates_0, 4, 1, 1, 1, 0, 1e-3, 1e4, 1e3, 50);
 for i = 1:np_Teilchen
-    N(i) = Molekueldynamik(coordinates_0(i,:), 4, sigma(i), E(i), m(i), 0, 1e-3, 1, 1, 50); % Teilcheneigenschaften zuordnen
+    N(i) = Teilchen(coordinates_0(i,:), 4, sigma(i), E(i), m(i)); % Teilcheneigenschaften zuordnen
     PL(i) = dlnode(N(i).coordinates_0); % jedes Teilchen: Particle List erstellen
 
     C(i,:) = round(N(i).coordinates_0./(2.5*sigma(i))) + 1; % Position der Teilchen zuordnen
 end
 
 [D, iA, iD] = unique(C, 'rows');
-n_cells = length(D); % Anzahl Zellen
+
 for i = 1:np_Teilchen
-    for j = i+1:np_Teilchen
-        if iD(i) == iD(j) % gleich wenn in einer Zelle
+    for j = i+1 : np_Teilchen
+        if iD(j) == iD(i) % gleich wenn in einer Zelle
             PL(j).insertAfter(PL(i)); % dann: Verlinkung der Particle Lists
-            for k = 1:n_cells
-                Cell(D(i)) = {PL(i), PL(j)};
-            end
-        end
-        for k = 1:n_cells
-            Cell(i) = {PL(i), PL(j)};
         end
     end
-    %jetzt: Speichern aller verlinkten Listen in Zellen (durch D
-    %bereits gegeben (in cell array?)
-%     for k = 1:n_cells
-%         Cell(D(k)) = {PL(i), PL(j)};
-%     end
+
 end
 
-for k = 1:n_cells
-    Cell(k) = {D(k,:), };
+% Zellen: gleicher Wert in Vektor iD
+n_cells = length(D); % Anzahl Zellen
+CellArray = cell(length(D), 1);
+
+for i = 1:length(iD)
+    CellArray{iD(i),1} = [CellArray{iD(i),1}, PL(i)];
+end
+% Particle List - head einführen: jede Zelle mit M+1 Teilchen (erstes
+% Teilchen kopieren, dann ab i = 2
+for i = 1:length(D)
+    CellArray{i,1} = [CellArray{i,1}(1,1),CellArray{i,1}];
 end
 
+% Kraftberechnung - z. B. LJ_Kraft oder Coulomb ...
+F = LJ_Kraft(xyz, sigma, E, d);
 
-%% Matlab code for the generation of linked lists via dlnode-class
-n1 = dlnode(1);
-n2 = dlnode(2);
-n3 = dlnode(3);
-
-% Build these nodes into a doubly linked list using the class methods:
-
-n2.insertAfter(n1) % Insert n2 after n1
-n3.insertAfter(n2) % Insert n3 after n2
-
-% Navigate through the list:
-n1.Next % Points to n2
-
-n2.Next.Pref % Points back to n2
-
-n1.Next.Next % Points to n3
-
-n3.Prev.Prev % Points to n1
+% % Zeitintegration - z. B. Velocity-Verlet
+% [xyz_all, v, E_kin_all, E_pot_all, E_tot, T_all] = Zeitintegration(xyz, t, delta_t, F, n_steps, v, m, sigma, E, d, np_Teilchen, a, delta_t*1e3);
 
 
 %% Matlab code for the recursive movement through list :
@@ -156,4 +124,98 @@ x = 0 : 1.5*sigma : 1.5*sigma*np_Teilchen;
 y = 0 : 1.5*sigma : 1.5*sigma*np_Teilchen;
 [X,Y] = meshgrid(x,y);
 coordinates_0 = [X(:), Y(:)];
+end
+
+function F_total = LJ_Kraft(xyz, sigma, E, d)
+% Berechnung der Kräfte
+n = length(xyz);
+F_neu = zeros(n,3,n);
+r = zeros(n,3,n);
+F_total = zeros(n,3);
+r_betrag = zeros(n,1,n);
+
+for i=1:n
+    r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
+    r(:,:,i) = r(:,:,i) - d.*round(r(:,:,i)./d);
+    for j=i:n
+        r_betrag(j,1,i) = norm(r(j,:,i));
+        r_betrag(i,1,j) = r_betrag(j,1,i);
+    end
+    F_neu(:,:,i) = bsxfun(@times, (24*E./(r_betrag(:,:,i).^2).*(sigma./r_betrag(:,:,i)).^6.*(1-2*(sigma./r_betrag(:,:,i)).^6)), r(:,:,i));
+    F = F_neu;
+    F(isnan(F_neu)) = 0;
+end
+F_total(:,:) = sum(F, 3);
+end
+
+function E_pot_total = LJ_Pot(xyz, sigma, E, a, d)
+n = length(xyz);
+E_pot = zeros(n,1,n);
+r = zeros(n,3,n);
+r_betrag = zeros(n,1,n);
+E_pot_total = zeros(n,1);
+
+for i=1:n
+    r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
+    r(:,:,i) = r(:,:,i) - d.*round(r(:,:,i)./d);
+    for j=i:n
+        r_betrag(j,1,i) = norm(r(j,:,i));
+        r_betrag(i,1,j) = r_betrag(j,1,i);
+    end
+    E_pot(:,:,i) = a*E*((sigma./r_betrag(:,:,i)).^6-(sigma./r_betrag(:,:,i)).^12);
+    E_korr = E_pot;
+    E_korr(isnan(E_pot)) = 0; % Korrektur für i = j
+end
+E_pot_total(:,:) = sum(E_korr, 3);
+end
+
+
+function [xyz_all, v, E_kin_all, E_pot_all, E_tot, T_all] = Zeitintegration(xyz, t, delta_t, F_0, n_steps, v, m, sigma, E, d, np_Teilchen, a, tau)
+% Velocity-Verlet
+xyz_all = zeros(length(xyz), 3, n_steps);
+E_kin_all = zeros(n_steps,1);
+E_pot_all = zeros(n_steps,1);
+T_all = zeros(n_steps,1);
+
+iteration = 0;
+v_Betrag = zeros(length(xyz), 1);
+T_0 = 50; % Zieltemperatur
+k_B = 3.1651e-06; % Boltzmann-Konstante in a. u.
+while t < delta_t*n_steps
+    t = t + delta_t;
+    iteration = iteration + 1;
+    xyz = xyz + delta_t*(v + F_0.*delta_t*0.5/m);
+
+    % neu: Periodische Randbedingungen
+    for i = 1:size(xyz, 1)
+        for j = 1:size(xyz, 2)
+            if xyz(i,j) >= 0.5*d(j)
+                xyz(i,j) = xyz(i,j) - d(j);
+            elseif xyz(i,j) < -0.5*d(j)
+                xyz(i,j) = xyz(i,j) + d(j);
+            end
+        end
+    end
+    F_neu = LJ_Kraft(xyz, sigma, E, d);
+    E_pot = sum(LJ_Pot(xyz, sigma, E, a, d))*0.5; % Korrektur: *0.5, da i~=j
+
+    % Temperaturkontrolle über Skalierung der Geschwindigkeiten mithilfe
+    % des Skalierungsfaktors lambda
+    v = v + bsxfun(@rdivide, (F_0+F_neu), 2*m)*delta_t;
+    for i = 1:size(xyz,1)
+        v_Betrag(i,1) = norm(v(i,:));
+    end
+    E_kin = sum(.5*m*(v_Betrag.^2))*0.5; % Korrektur: *0.5, da i~=j
+    T = 2*E_kin./(3*np_Teilchen*k_B);
+    lambda = sqrt(1+delta_t/tau*((T_0./T)-1));
+    v = v.*lambda;
+
+    xyz_all(:, :, iteration) = xyz(:, :);
+    E_kin_all(iteration,1) = E_kin(:,:);
+    E_pot_all(iteration,1) = E_pot(:,:);
+    T_all(iteration,1) = T(:,:);
+
+    F_0 = F_neu;
+end
+E_tot = E_pot_all + E_kin_all;
 end
