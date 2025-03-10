@@ -9,27 +9,17 @@ tic
 
 % Parameter importieren
 [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_302.txt');
-n_steps = 1e5;
+n_steps = 20;
 
 % Teilchen in Box
 [xyz, v, d] = Initialisierung_PBC(30, 30, 30, 10, sigma);
 
 tau = 41.32*1e3;
 T_0 = 50; % Zieltemperatur, 50 K
-xyz_0 = Molekueldynamik(xyz, a, sigma, E, m, t, delta_t, n_steps, tau, T_0);
-%%
+xyz_0 = Molekueldynamik(xyz, v, a, sigma, E, m, t, delta_t, n_steps, tau, T_0);
+
 Zeitintegration = xyz_0.VelocityVerlet;
 
-% Kraftberechnung - z. B. LJ_Kraft oder Coulomb ...
-% F_0 = LJ_Kraft(xyz, sigma, E, d);
-
-% % Zeitintegration - z. B. Velocity-Verlet
-% xyz_all = Zeitintegration(xyz, t, delta_t, F_0, n_steps, v, m, sigma, E, d);
-
-
-% % Visualisierung als Film in matlab oder output als xyz Datei für vmd
-% Visualisierung(A.coordinates, 'Film.avi')
-% Generate_xyz(xyz_all, 'Box.xyz')
 
 toc
 
@@ -107,39 +97,3 @@ for i = 1:n
 end     
 v = zeros(size(xyz, 1), 3);
 end
-
-
-function Visualisierung(xyz_all, Dateiname)
-% Visualisierung in matlab mithilfe von VideoWriter
-v = VideoWriter(Dateiname);
-open(v);
-figure;
-for i = 1:size(xyz_all,3)
-%     xyz_i = xyz_all(:, :, i);
-    clf;
-    plot3(xyz_all(:, 1, i), xyz_all(:, 2, i), xyz_all(:, 3, i), 'o', 'MarkerSize', 6);
-    title('Moleküldynamik');
-    xlabel('X'); ylabel('Y'); zlabel('Z'); grid on;
-    M = getframe(gcf);
-    writeVideo(v, M);
-end
-close(v);
-end
-
-function Generate_xyz(M, Dateiname)
-% Output als xyz Datei
-n = size(M, 1);
-Atomanzahl = repmat({'Ar'},n,1);
-fileID = fopen(Dateiname, 'w'); 
-
-for i=1:size(M,3)
-    fprintf(fileID, '%d\n', n);
-    fprintf(fileID, 'Moleküldynamik_3D\n');
-    for j = 1:n
-        fprintf(fileID, '%s %6.4f %6.4f %6.4f\n', Atomanzahl{j}, M(j,1,i), M(j,2,i), M(j,3,i));
-    end
-end
-
-fclose(fileID);
-end
-
