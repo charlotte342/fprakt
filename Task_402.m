@@ -80,70 +80,96 @@ F_0 = [];
 
 dij = [-1,-1; -1,0; -1,1; 0,-1; 0,0; 0,1; 1,-1; 1,0; 1,1]; % alle möglichen Variationen in 2D
 
-for i= 1:n_cells_x % alle möglichen Zellen
-    for j = 1:n_cells_y
-        % alle relevanten Positionen für dieses Teilchen
-        n_particle(i,j) = size(CellArray{i,j}, 2); % Anzahl Teilchen pro Zelle {i,j}
-        for k = 2: n_particle(i,j) % Schleife über alle Teilchen in Zelle
-            current_cell(k-1,:,i,j) = CellArray{i,j}(1,k).coordinates;
-        end
+x = 1:n_cells_x;
+y = 1:n_cells_y;
+
+[X,Y] = meshgrid(x,y);
+cells = [X(:),Y(:)]; % alle Zellkombinationen um loops zu sparen
+
+
+for i = 1:length(cells)
+    k=1;
+    while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Next)
+        currcell(k,:,cells(i,1),cells(i,2)) = CellArray{cells(i,1),cells(i,2)}(1,1).Next.coordinates;
+        CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Next;
+        k=k+1;
     end
 end
-for i=1:n_cells_x
-    for j=1:n_cells_y
-        for k = 2:n_particle(i,j)
-            xyz = []; % clear xyz
-            for l = 1:length(dij)
-                if i+dij(l,1) > 0 && j+dij(l,2) > 0 && i+dij(l,1)<= n_cells_x && j+dij(l,2) <= n_cells_y
-                    xyz = [xyz; current_cell(:,:,i+dij(l,1),j+dij(l,2))]; % alle relevanten Koordinaten für Teilchen i in Zelle k
-                end
-            end
-            xyz(all(xyz == 0, 2), :) = [];
-            n = size(xyz, 1);
-            F_neu = zeros(n,2);
-            r = zeros(n,2);
-            for n = 1:n
-                r(n,:) = xyz(n,:) - CellArray{i,j}(1,k).coordinates; % Abstand zu jedem Teilchen k in Zelle ij (aus CellArray)
-                F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
-                F = F_neu;
-                F(isnan(F_neu)) = 0;
-            end
-            F(k-1,:) = sum(F, 1);
-            F_total(k-1,:,i,j) = F(k-1,:);
-        end
-        F_0 = [F_0; F_total(:,:,i,j)];
+
+% reset ' pointer ' to initial :
+for i = 1:length(cells)
+    while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Prev)
+        CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Prev;
     end
+end
+
+% Kraftberechnung durch Zellen --> Koordinaten korrekt anordnen, damit
+% Zuordnung stimmt
+coordinates = [];
+F_0 = [];
+iteration = 0;
+for i=1:length(cells)
+    iteration = iteration + 1;
+    k =1;
+    F = [];
+    while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Next) % zum Zählen der Elemente pro linked list (pro Zelle, ungleich CellArray)
+        CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Next;
+        coordinates = [coordinates; currcell(k,:,cells(i,1),cells(i,2))];
+        xyz = []; % clear xyz
+        for l = 1:length(dij)
+            if cells(i,1)+dij(l,1) > 0 && cells(i,2)+dij(l,2) > 0 && cells(i,1)+dij(l,1)<= size(particle_head, 1) && cells(i,2)+dij(l,2) <= size(particle_head,2)
+                xyz = [xyz; currcell(:,:,cells(i,1)+dij(l,1),cells(i,2)+dij(l,2))]; % alle relevanten Koordinaten für Teilchen k in Zelle i
+            end
+        end
+        xyz(all(xyz == 0, 2),:) = [];
+        n=length(xyz);
+        F_neu = zeros(n,2);
+        r = zeros(n,2);
+        for n = 1:size(xyz,1)
+            r(n,:) = xyz(n,:) - currcell(k,:,cells(i,1),cells(i,2)); % Abstand zu jedem Teilchen k in Zelle ij (aus CellArray)
+            if r(n,:) > 2.5*sigma
+                r(n,:) = zeros(1,2);
+            end
+            F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
+            F_neu(isnan(F_neu)) = 0;
+        end
+        F(k,:) = sum(F_neu, 1);
+        F_total(k,:,cells(i,1),cells(i,2)) = F(k,:);
+        k = k+1;
+    end
+    F_0 = [F_0; F_total(:,:,cells(i,1),cells(i,2))];
 end
 
 F_0(all(F_0 == 0, 2), :) = [];
+% reset ' pointer ' to initial :
+
+for i = 1:length(cells)
+    while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Prev)
+        CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Prev;
+    end
+end
 
 
-
-
-
-
-
-%% Velocity-Verlet
+% Velocity-Verlet
 tic
 
 
-n_steps = 30;
+n_steps = 1000;
 t = 0;
 % for i = 1:np_Teilchen
 %     v(i,:) = PL(i).velocities;
 % end
 v = zeros(np_Teilchen,2);
 delta_t = 1e-2;
-tau = delta_t*1e3;
+tau = delta_t;
 a = 4;
-coordinates = coordinates_0;
-
-x = 1:n_cells_x;
-y = 1:n_cells_y;
-
-[X,Y] = meshgrid(x,y);
-cells = [X(:),Y(:)]; % alle Zellkombinationen um loops zu sparen
-np_cell = zeros(length(cells), 1);
+% 
+% x = 1:n_cells_x;
+% y = 1:n_cells_y;
+% 
+% [X,Y] = meshgrid(x,y);
+% cells = [X(:),Y(:)]; % alle Zellkombinationen um loops zu sparen
+% np_cell = zeros(length(cells), 1);
 
 E_kin_all = zeros(n_steps,1);
 E_pot_all = zeros(n_steps,1);
@@ -166,34 +192,50 @@ while t < delta_t*n_steps
     for i = 1:np_Teilchen
         PL(i).coordinates = coordinates(i,:); % Aktualisierung
         PL(i).forces = F_0(i,:);
-        C_0(i,:) = ceil(PL(i).coordinates./(2.5*sigma)); % Position der Teilchen zuordnen
+        C_0(i,:) = round(PL(i).coordinates./(2.5*sigma)); % Position der Teilchen zuordnen
     end
 % 
     while sum(bsxfun(@ge, zeros(length(C_0), 2), C_0), 'all') > 0
         C_0 = C_0 + 1;
     end
 
-
+%     % Entstehung neuer Zellen
+%     for i = 1:np_Teilchen
+%         if bsxfun(@gt, C_0(i,:), size(particle_head))
+%             cells = [cells; C_0(i,:)];
+%             PL(i).removeNode
+%             particle_head(C_0(i,1), C_0(i,2)) = PL(i).deepCopy;
+%         end
+%     end
+% 
+% % 
+% %     if max(C_0,[],'all') > max(cells, [], 'all')
+% %         [M,I] = max(C_0,[],'all'); % gibt Index mit an
+% %         cells = [cells; C_0(I,:)];
+% %         PL(I).removeNode
+% %         particle_head(C_0(I,1), C_0(I,2)) = PL(I).deepCopy;
+% %     end
+% 
     for i = 1:np_Teilchen
         if C_0(i,:)/ C(i,:) ~= 1
             PL(i).removeNode;
-            PL(i).insertAfter(particle_head(C_0(i,1), C_0(i,2))); % neue Verknüpfung
+            PL(i).insertAfter(CellArray{C_0(i,1),C_0(i,2)}(1,1)); % neue Verknüpfung
         end
     end
-    
+    currcell = [];
     for i = 1:length(cells)
         k=1;
-        while ~isempty(particle_head(cells(i,1),cells(i,2)).Next)
-            currcell(k,:,cells(i,1),cells(i,2)) = particle_head(cells(i,1),cells(i,2)).Next.coordinates;
-            particle_head(cells(i,1),cells(i,2)) = particle_head(cells(i,1),cells(i,2)).Next;
+        while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Next)
+            currcell(k,:,cells(i,1),cells(i,2)) = CellArray{cells(i,1),cells(i,2)}(1,1).Next.coordinates;
+            CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Next;
             k=k+1;
         end
     end
 
     % reset ' pointer ' to initial :
     for i = 1:length(cells)
-        while ~isempty(particle_head(cells(i,1),cells(i,2)).Prev)
-            particle_head(cells(i,1),cells(i,2)) = particle_head(cells(i,1),cells(i,2)).Prev;
+        while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Prev)
+            CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Prev;
         end
     end
 
@@ -201,39 +243,50 @@ while t < delta_t*n_steps
 
     F_0 = [];
     F_total = [];
-    for i=1:n_cells_x
-        for j=1:n_cells_y
-            k =1;
-            while ~isempty(particle_head(i,j).Next) % zum Zählen der Elemente pro linked list (pro Zelle, ungleich CellArray)
-                particle_head(i,j) = particle_head(i,j).Next;
-                xyz = []; % clear xyz
-                for l = 1:length(dij)
-                    if i+dij(l,1) > 0 && j+dij(l,2) > 0 && i+dij(l,1)<= n_cells_x && j+dij(l,2) <= n_cells_y
-                        xyz = [xyz; current_cell(:,:,i+dij(l,1),j+dij(l,2))]; % alle relevanten Koordinaten für Teilchen i in Zelle k
-                    end
+    coordinates = [];
+    for i=1:length(cells)
+        k =1;
+        while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Next) % zum Zählen der Elemente pro linked list (pro Zelle, ungleich CellArray)
+            CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Next;
+            coordinates = [coordinates; currcell(k,:,cells(i,1),cells(i,2))];
+            xyz = []; % clear xyz
+            for l = 1:length(dij)
+                if cells(i,1)+dij(l,1) > 0 && cells(i,2)+dij(l,2) > 0 && cells(i,1)+dij(l,1)<= size(CellArray, 1) && cells(i,2)+dij(l,2) <= size(CellArray,2)
+                    xyz = [xyz; currcell(:,:,cells(i,1)+dij(l,1),cells(i,2)+dij(l,2))]; % alle relevanten Koordinaten für Teilchen i in Zelle k
                 end
-                xyz(all(xyz == 0, 2), :) = [];
-                F_neu = zeros(n,2);
-                r = zeros(n,2);
-                F = [];
-                for n = 1:size(xyz,1)
-                    r(n,:) = xyz(n,:) - current_cell(k,:,i,j); % Abstand zu jedem Teilchen k in Zelle ij (aus CellArray)
-                    F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
-                    F_neu(isnan(F_neu)) = 0;
-                end
-                F(k,:) = sum(F_neu, 1);
-                F_total(k,:,i,j) = F(k,:);
-                k = k+1;
             end
-            F_0 = [F_0; F_total(:,:,i,j)];
+            xyz(all(xyz == 0, 2), :) = [];
+            n = size(xyz,1);
+            F_neu = zeros(n,2);
+            r = zeros(n,2);
+            F = [];
+            for n = 1:size(xyz,1)
+                r(n,:) = xyz(n,:) - currcell(k,:,cells(i,1),cells(i,2)); % Abstand zu jedem Teilchen k in Zelle ij (aus CellArray)
+                if r(n,:) > 2.5*sigma
+                    r(n,:) = zeros(1,2);
+                end
+                F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
+                if norm(F_neu(n,:)) > 1e3
+                    disp(r(n,:));
+                    disp(xyz(n,:));
+                    disp(currcell(k,:,cells(i,1),cells(i,2)))
+                    disp(currcell(k,:,cells(i,1),cells(i,2)))
+
+                end
+                F_neu(isnan(F_neu)) = 0;
+            end
+            F(k,:) = sum(F_neu, 1);
+            F_total(k,:,cells(i,1),cells(i,2)) = F(k,:);
+            k = k+1;
         end
+        F_0 = [F_0; F_total(:,:,cells(i,1),cells(i,2))];
     end
     F_0(all(F_0 == 0, 2), :) = [];
 
     % reset ' pointer ' to initial :
     for i = 1:length(cells)
-        while ~isempty(particle_head(cells(i,1),cells(i,2)).Prev)
-            particle_head(cells(i,1),cells(i,2)) = particle_head(cells(i,1),cells(i,2)).Prev;
+        while ~isempty(CellArray{cells(i,1),cells(i,2)}(1,1).Prev)
+            CellArray{cells(i,1),cells(i,2)}(1,1) = CellArray{cells(i,1),cells(i,2)}(1,1).Prev;
         end
     end  
 
@@ -266,23 +319,42 @@ end
 
 
 toc
+%%
+figure;
+plot(T_all, '-b', 'LineWidth', 2);
+title('Temperaturverlauf');
+xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
+figure;
+plot(E_pot_all+E_kin_all, '-g', 'LineWidth', 2);
+hold on
+plot(E_kin_all, '-b','LineWidth',2);
+hold on
+plot(E_pot_all, '-r', 'LineWidth', 2);
+title('Energie des Systems');
+xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
+legend('Gesamtenergie', 'kinetische Energie', 'potentielle Energie');
+
+
+
+
 
 
 %% Kraftberechnung
 F_0 = LJ_Kraft(CellArray, sigma, E);
 
 %% Zeitintegration
-n_steps = 100;
+n_steps = 200;
 t = 0;
 v = zeros(np_Teilchen,2);
 delta_t = 1e-2;
-tau = delta_t*1e3;
+tau = delta_t;
 a = 4;
 
 [xyz_all, v_all] = Zeitintegration(CellArray, coordinates_0, t, delta_t, F_0, n_steps, v, m, sigma, E, np_Teilchen, a, tau);
 
 %%
-Visualisierung(xyz_all, 'Film.avi')
+% Visualisierung(xyz_all, 'Film.avi')
+Generate_xyz(xyz_all, '402.xyz')
 
 %% Funktionen
 function [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter(Textdatei1)
@@ -481,14 +553,21 @@ end
 close(v);
 end
 
+function Generate_xyz(M, Dateiname)
+% Output als xyz Datei
+n = size(M, 1);
+Atomanzahl = repmat({'Ar'},n,1);
+fileID = fopen(Dateiname, 'w'); 
+% z_positions = zeros(n,1); 
 
-function n_particle = countLinks(headNode)
-n_particle = 0;    
-currentNode = headNode;
-    
-    % Traverse the linked list
-    while ~isempty(currentNode)
-        n_particle = n_particle + 1;
-        currentNode = currentNode.Next; % Go to the next node in the list
+
+for i=1:size(M,3)
+    fprintf(fileID, '%d\n', n);
+    fprintf(fileID, 'Moleküldynamik_3D\n');
+    for j = 1:n
+        fprintf(fileID, '%s %f %f %f\n', Atomanzahl{j}, M(j,1,i), M(j,2,i), 0);
     end
+end
+
+fclose(fileID);
 end
