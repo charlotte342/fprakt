@@ -23,7 +23,7 @@ iteration_total = int32(t_end/delta_t);
 v = zeros(n,2);
 xy_positions = zeros(n,2,iteration_total);
 
-% output in matlab
+%% output in matlab
 figure;
 for i=1:n
     plot(Positions(i,1), Positions(i,2), 'ro', 'LineWidth', 1);

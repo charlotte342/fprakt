@@ -1,6 +1,9 @@
-classdef Molekueldynamik
+classdef LinkedCell
+    % coordinates, velocities...
+
     properties
         coordinates_0
+        forces_0
         velocities_0
         a
         sigma
@@ -11,19 +14,27 @@ classdef Molekueldynamik
         n_steps
         tau
         T_0 % Zieltemperatur
-        VelocityVerlet
     end
     properties (Dependent)
+        coordinates
+        velocities
+        temperature
+        energy
         E_pot
+        E_pot_all 
+        E_kin_all
         n
         t_end
-        F 
+        F % Force
+%         T_all % Gesamttemperatur
+%         E_kin_all % kinetische Energie, alle Schritte
     end
     properties (Constant, Hidden)
         k_B = 3.1651e-06;
     end
     methods
-        function obj=Molekueldynamik(coordinates_0, velocities_0, a, sigma, E, m, t, delta_t, n_steps, tau, T_0) % heißt wie Klasse
+        % initialize, propagate...
+        function obj=LinkedCell(coordinates_0, forces_0, velocities_0, a, sigma, E, m, t, delta_t, n_steps, tau, T_0) % heißt wie Klasse
             % Input
             obj.a=a;
             obj.sigma=sigma;
@@ -33,41 +44,39 @@ classdef Molekueldynamik
             obj.delta_t=delta_t;
             obj.n_steps=n_steps;
             obj.coordinates_0=coordinates_0;
+            obj.forces_0 = forces_0;
             obj.velocities_0 = velocities_0;
             obj.tau = tau;
             obj.T_0 = T_0;
-
         end
       
         function n=get.n(obj)
+%             n=size(obj.coordinates_0,1);
             n = size(obj.coordinates_0,1);
         end
         function t_end = get.t_end(obj)
             t_end = obj.delta_t*obj.n_steps;
         end
-%         function velocities_0=get.velocities_0(obj)
-%             velocities_0=zeros(size(obj.coordinates_0,1), size(obj.coordinates_0,2));
+
+%         function F = get.F(obj)
+%             % Berechnung der Kräfte
+%             F_neu = zeros(obj.n,3,obj.n);
+%             r = zeros(obj.n,3,obj.n);
+%             F = zeros(obj.n,3);
+%             d = [30,30,30];
+% 
+%             for i=1:obj.n
+%                 r(:,:,i) = bsxfun(@minus, obj.coordinates_0(i,:), obj.coordinates_0);
+%                 r(:,:,i) = r(:,:,i) - d.*round(r(:,:,i)./d);
+% 
+%                 % neu: direkte Berechnung der Kraft ohne Betrag und
+%                 % norm-Funktion
+%                 F_neu(:,:,i) = bsxfun(@times, (24*obj.E./sum(r(:,:,i).^2, 2).*obj.sigma^6./((sum(r(:,:,i).^2, 2)).^3).*(1-2*(obj.sigma^6./(sum(r(:,:,i).^2,2).^3)))), r(:,:,i));
+%                 F_korr = F_neu;
+%                 F_korr(isnan(F_neu)) = 0;
+%             end
+%             F(:,:) = sum(F_korr, 3);
 %         end
-
-        function F = get.F(obj)
-            % Berechnung der Kräfte
-            F_neu = zeros(obj.n,3,obj.n);
-            r = zeros(obj.n,3,obj.n);
-            F = zeros(obj.n,3);
-            d = [30,30,30];
-
-            for i=1:obj.n
-                r(:,:,i) = bsxfun(@minus, obj.coordinates_0(i,:), obj.coordinates_0);
-                r(:,:,i) = r(:,:,i) - d.*round(r(:,:,i)./d);
-
-                % neu: direkte Berechnung der Kraft ohne Betrag und
-                % norm-Funktion
-                F_neu(:,:,i) = bsxfun(@times, (24*obj.E./sum(r(:,:,i).^2, 2).*obj.sigma^6./((sum(r(:,:,i).^2, 2)).^3).*(1-2*(obj.sigma^6./(sum(r(:,:,i).^2,2).^3)))), r(:,:,i));
-                F_korr = F_neu;
-                F_korr(isnan(F_neu)) = 0;
-            end
-            F(:,:) = sum(F_korr, 3);
-        end
 
         function E_pot = get.E_pot(obj)
             E_pot_iteration = zeros(obj.n,1,obj.n);
@@ -87,7 +96,8 @@ classdef Molekueldynamik
             E_pot(:,:) = sum(E_korr, 3);
         end
 
-        function VelocityVerlet = get.VelocityVerlet(obj)
+
+        function result = VelocityVerlet(obj)
 
             % Velocity-Verlet-Propagator
             result.coordinates = zeros(length(obj.coordinates_0), 3, obj.n_steps);
@@ -96,7 +106,6 @@ classdef Molekueldynamik
             result.E_kin_all = zeros(obj.n_steps,1);
             result.E_pot_all = zeros(obj.n_steps,1);
             result.temperature = zeros(obj.n_steps,1);
-            result.forces = zeros(obj.n,3,obj.n_steps);
             result.velocities = zeros(length(obj.coordinates_0), 3, obj.n_steps);
             d = [30,30,30];
 
@@ -106,11 +115,10 @@ classdef Molekueldynamik
             while obj.t < obj.delta_t*obj.n_steps
                 obj.t = obj.t + obj.delta_t;
                 iteration = iteration + 1;
-                F_0 = obj.F;
-                result.forces(:,:,iteration) = F_0;
-                xyz = obj.coordinates_0 + obj.delta_t*(obj.velocities_0 + obj.F.*obj.delta_t*0.5/obj.m);
+                F_0 = obj.forces_0;
+                xyz = obj.coordinates_0 + obj.delta_t*(obj.velocities_0 + F_0.*obj.delta_t*0.5/obj.m);
 
-                % Periodische Randbedingungen
+                % neu: Periodische Randbedingungen
                 for i = 1:size(xyz, 1)
                     for j = 1:size(xyz, 2)
                         if xyz(i,j) >= 0.5*d(j)
@@ -123,7 +131,7 @@ classdef Molekueldynamik
 
                 % Temperaturkontrolle über Skalierung der Geschwindigkeiten mithilfe
                 % des Skalierungsfaktors lambda
-                new_velocities = obj.velocities_0 + bsxfun(@rdivide, (F_0+obj.F), 2*obj.m)*obj.delta_t;
+                new_velocities = velocities_0 + bsxfun(@rdivide, (F_0+obj.F), 2*obj.m)*obj.delta_t;
                 for i = 1:size(xyz,1)
                     v_Betrag(i,1) = norm(new_velocities(i,:));
                 end
@@ -139,59 +147,78 @@ classdef Molekueldynamik
                 result.energy(iteration,1) = E_kin + sum(obj.E_pot(:,:))*0.5;
 
                 result.temperature(iteration,1) = T(:,:);
-                result.velocities(:,:,iteration) = obj.velocities_0;
-                obj.velocities_0 = new_velocities;
+                result.velocities(:,:,iteration) = velocities_0;
+                velocities_0 = new_velocities;
                 result.coordinates(:,:,iteration) = xyz;
-                VelocityVerlet = result;
             end
+            figure;
+            plot(result.temperature, '-b', 'LineWidth', 2);
+            title('Temperaturverlauf');
+            xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
+            figure;
+            plot(result.energy, '-g', 'LineWidth', 2);
+            hold on
+            plot(result.E_kin_all, '-b','LineWidth',2);
+            hold on
+            plot(result.E_pot_all, '-r', 'LineWidth', 2);
+            title('Energie des Systems');
+            xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
+            legend('Gesamtenergie', 'kinetische Energie', 'potentielle Energie');
+
+%             v = VideoWriter('Video.avi');
+%             open(v);
+%             figure;
+%             for i = 1:obj.n_steps
+%                 %     xyz_i = xyz_all(:, :, i);
+%                 clf;
+%                 plot3(result.coordinates(:, 1, i), result.coordinates(:, 2, i), result.coordinates(:, 3, i), 'o', 'MarkerSize', 6);
+%                 title('Moleküldynamik');
+%                 xlabel('X'); ylabel('Y'); zlabel('Z'); grid on;
+%                 M = getframe(gcf);
+%                 writeVideo(v, M);
+%             end
+%             close(v);
+        end
+ 
+%             figure
+%             plot(result.temperature, '-b', 'LineWidth', 2);
+%             title('Temperaturverlauf');
+%             xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
+%             figure;
+%             plot(result.energy, '-b','LineWidth',2);
+%             title('Energie');
+%             xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
+       
+        
+        function plot_data(obj)
+            figure;
+            plot(obj.temperature, '-b', 'LineWidth', 2);
+            title('Temperaturverlauf');
+            xlabel('Zeit / fs in a.u.'); ylabel('Temperatur / K'); grid on;
+            figure;
+            plot(result.energy, '-b','LineWidth',2);
+            title('Energie');
+            xlabel('Zeit / fs in a.u.'); ylabel('Energie / a.u.'); grid on;
         end
 
-        function plot_temperature(obj)
-            figure;
-            plot(obj.VelocityVerlet.temperature, '-b', 'LineWidth', 2);
-            title('Temperaturverlauf');
-            xlabel('Zeit / a.u.'); ylabel('Temperatur / K'); grid on;
-        end
-        function plot_energy(obj)
-            figure;
-            plot(obj.VelocityVerlet.energy, '-g', 'LineWidth', 2);
-            hold on
-            plot(obj.VelocityVerlet.E_kin_all, '-b','LineWidth',2);
-            hold on
-            plot(obj.VelocityVerlet.E_pot_all, '-r', 'LineWidth', 2);
-            title('Energie des Systems');
-            xlabel('Zeit / a.u.'); ylabel('Energie / a.u.'); grid on;
-            legend('Gesamtenergie', 'kinetische Energie', 'potentielle Energie');
-        end
 
         function Visualisierung(obj)
+            % Visualisierung in matlab mithilfe von VideoWriter
             v = VideoWriter('Video.avi');
             open(v);
             figure;
             for i = 1:obj.n_steps
+                %     xyz_i = xyz_all(:, :, i);
                 clf;
-                plot3(obj.VelocityVerlet.coordinates(:, 1, i), obj.VelocityVerlet.coordinates(:, 2, i), obj.VelocityVerlet.coordinates(:, 3, i), 'o', 'MarkerSize', 6);
+                plot3(obj.coordinates(:, 1, i), xyz_all(:, 2, i), xyz_all(:, 3, i), 'o', 'MarkerSize', 6);
                 title('Moleküldynamik');
                 xlabel('X'); ylabel('Y'); zlabel('Z'); grid on;
                 M = getframe(gcf);
                 writeVideo(v, M);
             end
             close(v);
-        end
+end
 
-        function Generate_xyz(obj)
-            Atomanzahl = repmat({'H'},obj.n,1);
-            fileID = fopen('Moleküldynamik.xyz', 'w');
-            M = obj.VelocityVerlet.coordinates;
 
-            for i=1:size(M,3)
-                fprintf(fileID, '%d\n', obj.n);
-                fprintf(fileID, 'Moleküldynamik_3D\n');
-                for j = 1:obj.n
-                    fprintf(fileID, '%s %6.4f %6.4f %6.4f\n', Atomanzahl{j}, M(j,1,i), M(j,2,i), M(j,3,i));
-                end
-            end
-            fclose(fileID);
-        end
     end
 end

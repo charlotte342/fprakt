@@ -2,7 +2,9 @@ classdef dlnode < handle
    % dlnode A class to represent a doubly-linked node.
    % Link multiple dlnode objects together to create linked lists.
    properties
-      Data
+      coordinates
+      velocities
+      forces
    end
    properties(SetAccess = private)
       Next = dlnode.empty
@@ -10,12 +12,17 @@ classdef dlnode < handle
    end
    
    methods
-      function node = dlnode(Data)
+       function node = dlnode(coordinates, velocities, forces)
          % Construct a dlnode object
          if nargin > 0
-            node.Data = Data;
+            node.coordinates = coordinates;
+            node.velocities = velocities;
+            node.forces = forces;
          end
-      end
+       end
+       function copyNode = deepCopy(node)
+           copyNode = dlnode(node.coordinates, node.velocities, node.forces);
+       end
       
       function insertAfter(newNode, nodeBefore)
          % Insert newNode after nodeBefore.

@@ -7,11 +7,11 @@
 tic
 
 % Parameter importieren
-[a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Datenimport.txt');
+[a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_301.txt');
 
 % xyz Positionen importieren, v bei 0 initialisieren
-[xyz,v] = Positionen('301_import.txt');
-
+[xyz,v] = Positionen('Positionen_301.txt');
+%%
 
 % Kraftberechnung - z. B. LJ_Kraft oder Coulomb ...
 F_0 = LJ_Kraft(xyz, sigma, E);

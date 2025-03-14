@@ -24,7 +24,7 @@ F = LJ_Kraft(xyz, sigma, E, d);
 % % Zeitintegration - z. B. Velocity-Verlet
 [xyz_all, v, E_kin_all, E_pot_all, E_tot, T_all] = Zeitintegration(xyz, t, delta_t, F, n_steps, v, m, sigma, E, d, np_Teilchen, a, delta_t*1e3); % letzte ist tau fürs Thermostat
 
-%%
+
 Visualisierung(xyz, 'Film.avi')
 %%
 
