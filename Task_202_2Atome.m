@@ -12,7 +12,7 @@ F = LJ_Kraft(Positions, sigma, E);
 
 t = 0;
 delta_t = 0.001;
-t_end = delta_t*1000;
+t_end = delta_t*10000;
 iteration = 0;
 iteration_total = t_end/delta_t;
 
@@ -49,7 +49,17 @@ end
 % movie(M)
 toc
 
-% Output als xyz-file 
+
+figure;
+iteration = t_end/delta_t;
+for s = 1:iteration
+    for i = 1:n
+        plot(xyz_positions(i,1,s), xyz_positions(i,2,s), 'bo', 'LineWidth', 1);
+        hold on
+    end
+end
+
+%% Output als xyz-file 
 atome = repmat({'H'},n,1);
 fileID = fopen('202_2Atome.xyz', 'w'); 
 

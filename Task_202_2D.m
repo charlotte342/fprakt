@@ -15,7 +15,7 @@ F = LJ_Kraft(Positions, sigma, E);
 
 t = 0;
 delta_t = 0.0001;
-t_end = delta_t*10;
+t_end = delta_t*100;
 iteration = 0;
 iteration_total = int32(t_end/delta_t);
 
@@ -24,12 +24,12 @@ v = zeros(n,2);
 xy_positions = zeros(n,2,iteration_total);
 
 %% output in matlab
-figure;
-for i=1:n
-    plot(Positions(i,1), Positions(i,2), 'ro', 'LineWidth', 1);
-    hold on
-end
-hold on
+% figure;
+% for i=1:n
+%     plot(Positions(i,1), Positions(i,2), 'ro', 'LineWidth', 1);
+%     hold on
+% end
+% hold on
 
 %% Kraftberechnung und Moleküldynamik
 
@@ -75,7 +75,16 @@ toc
 %     end
 % end
 
-fclose(fileID);
+% fclose(fileID);
+%%
+figure;
+iteration = t_end/delta_t;
+for s = 1:iteration
+    for i = 1:n
+        plot(xy_positions(i,1,s), xy_positions(i,2,s), 'bo', 'LineWidth', 1);
+        hold on
+    end
+end
 %% Funktionen
 
 function F_total = LJ_Kraft(x, sigma, E)

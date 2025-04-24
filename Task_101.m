@@ -21,7 +21,7 @@ end
 hold on
 
 delta_t = 0.1;
-t_end = delta_t*1000;
+t_end = delta_t*10;
 j = t_end/delta_t;
 t = 0;
 x_positions = zeros(n,2,j);

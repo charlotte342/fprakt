@@ -17,7 +17,8 @@ classdef Molekueldynamik
         E_pot
         n
         t_end
-        F 
+        F
+        F_Coulomb
     end
     properties (Constant, Hidden)
         k_B = 3.1651e-06;
@@ -68,6 +69,28 @@ classdef Molekueldynamik
             end
             F(:,:) = sum(F_korr, 3);
         end
+
+        function F_Coulomb = get.F_Coulomb(obj)
+            % Berechnung der Kräfte
+            F_neu = zeros(obj.n,3,obj.n);
+            r = zeros(obj.n,3,obj.n);
+            Q = zeros(obj.n, obj. n);
+
+            F_Coulomb = zeros(obj.n,3);
+            d = [30,30,30];
+
+            for i=1:obj.n
+                r(:,:,i) = bsxfun(@minus, obj.coordinates_0(i,:), obj.coordinates_0);
+                r(:,:,i) = r(:,:,i) - d.*round(r(:,:,i)./d);
+                Q(:,i) = bsxfun(@times, obj.q(i,:), obj.q); % q als Vektor mit allen Partialladungen
+
+                F_neu(:,:,i) = 1/(4*pi*epsilon_0).*Q(:,i)./(sum(r(:,:,i).^2, 2)^1.5) .* r(:,:,i);
+                F_korr = F_neu;
+                F_korr(isnan(F_neu)) = 0;
+            end
+            F_Coulomb(:,:) = sum(F_korr, 3);
+        end
+        
 
         function E_pot = get.E_pot(obj)
             E_pot_iteration = zeros(obj.n,1,obj.n);

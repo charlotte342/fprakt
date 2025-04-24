@@ -9,7 +9,7 @@ tic
 
 % Parameter importieren
 [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter('Parameter_302.txt');
-n_steps = 20;
+n_steps = 1e4;
 
 % Teilchen in Box
 [xyz, v, d] = Initialisierung_PBC(30, 30, 30, 10, sigma);
@@ -20,6 +20,8 @@ xyz_0 = Molekueldynamik(xyz, v, a, sigma, E, m, t, delta_t, n_steps, tau, T_0);
 
 Zeitintegration = xyz_0.VelocityVerlet;
 
+% xyz_0.plot_energy
+% xyz_0.plot_temperature
 
 toc
 
