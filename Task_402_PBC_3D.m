@@ -72,13 +72,11 @@ end
 
 % Ausklamüsern
 
-% Berechnung der Kräfte
+%% Berechnung der Kräfte
 
 n_cells_x = size(CellArray, 1);
 n_cells_y = size(CellArray, 2);
 n_cells_z = size(CellArray, 3);
-
-F_0 = [];
 
 x = -1:1;
 y = -1:1;
@@ -95,7 +93,7 @@ z = 1:n_cells_z;
 [X,Y,Z] = meshgrid(x,y,z);
 cells = [X(:),Y(:),Z(:)]; % alle Zellkombinationen um loops zu sparen
 
-%%
+
 for i = 1:length(cells)
     k=1;
     if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
@@ -187,7 +185,7 @@ t = 0;
 % for i = 1:np_Teilchen
 %     v(i,:) = PL(i).velocities;
 % end
-v = zeros(np_Teilchen,2);
+v = zeros(np_Teilchen,3);
 delta_t = 1e-2;
 tau = delta_t*1e3;
 a = 4;
@@ -201,9 +199,9 @@ v_Betrag = zeros(length(coordinates), 1);
 T_0 = 50; % Zieltemperatur
 k_B = 3.1651e-06; % Boltzmann-Konstante in a. u.
 
-xyz_all = zeros(np_Teilchen, 2, n_steps);
-v_all = zeros(np_Teilchen, 2, n_steps);
-F_all = zeros(np_Teilchen, 2, n_steps);
+xyz_all = zeros(np_Teilchen, 3, n_steps);
+v_all = zeros(np_Teilchen, 3, n_steps);
+F_all = zeros(np_Teilchen, 3, n_steps);
 while t < delta_t*n_steps
     t = t + delta_t;
     iteration = iteration + 1;
@@ -218,25 +216,24 @@ while t < delta_t*n_steps
         end
     end
 
-    C_0 = zeros(np_Teilchen, 2);
+    C_0 = zeros(np_Teilchen, 3);
     for i = 1:np_Teilchen
         PL(i).coordinates = coordinates(i,:); % Aktualisierung
         PL(i).forces = F_0(i,:);
         C_0(i,:) = ceil(PL(i).coordinates./(2.5*sigma)); % Position der Teilchen zuordnen
     end
-% 
+ 
     while sum(bsxfun(@ge, zeros(length(C_0), 2), C_0), 'all') > 0
         C_0 = C_0 + 1;
     end
 
-
     for i = 1:np_Teilchen
         if C_0(i,:)/ C(i,:) ~= 1
             PL(i).removeNode;
-            PL(i).insertAfter(particle_head(C_0(i,1), C_0(i,2))); % neue Verknüpfung
+            PL(i).insertAfter(particle_head(C_0(i,1), C_0(i,2), C_0(i,3))); % neue Verknüpfung
         end
     end
-    F_0 = LJ_Kraft(CellArray, sigma, E);
+    F_0 = LJ_Kraft(CellArray, sigma, E, d);
 
 
     % reset ' pointer ' to initial :
@@ -278,7 +275,7 @@ toc
 
 
 %% Kraftberechnung
-F_0 = LJ_Kraft(CellArray, sigma, E);
+F_ok = LJ_Kraft(CellArray, sigma, E, d);
 
 %% Zeitintegration
 n_steps = 100;
@@ -379,8 +376,27 @@ end
 v = zeros(n,3);
 end
 
-function F_0 = LJ_Kraft(CellArray, sigma, E) %d
+function F_0 = LJ_Kraft(CellArray, sigma, E, d) %d
 % Berechnung der Kräfte
+
+n_cells_x = size(CellArray, 1);
+n_cells_y = size(CellArray, 2);
+n_cells_z = size(CellArray, 3);
+
+x = -1:1;
+y = -1:1;
+z = -1:1;
+
+[X,Y,Z] = meshgrid(x,y,z);
+dxyz = [X(:), Y(:), Z(:)];
+
+
+x = 1:n_cells_x;
+y = 1:n_cells_y;
+z = 1:n_cells_z;
+
+[X,Y,Z] = meshgrid(x,y,z);
+cells = [X(:),Y(:),Z(:)]; % alle Zellkombinationen um loops zu sparen
 
 currcell = [];
 for i = 1:length(cells)

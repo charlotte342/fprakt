@@ -5,6 +5,7 @@
 
 %% Anfangsbedingungen: 2D-System aus N_cell = N_cell,x * N_cell,y (r_cut = 2.5*sigma, sigma = 1) mit N Partikel auf einem Gitter im Abstand 1.5*sigma und v_0 = 0
 
+
 sigma = 1;
 np_Teilchen = 8*8; 
 coordinates_0 = Anfangspositionen(sigma, sqrt(np_Teilchen)-1);
