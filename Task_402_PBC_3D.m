@@ -93,22 +93,40 @@ z = 1:n_cells_z;
 [X,Y,Z] = meshgrid(x,y,z);
 cells = [X(:),Y(:),Z(:)]; % alle Zellkombinationen um loops zu sparen
 
-
-for i = 1:length(cells)
-    k=1;
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next)
-            currcell(k,:,cells(i,1),cells(i,2),cells(i,3)) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next.coordinates;
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next;
-            k=k+1;
+for h = 1:np_Teilchen
+    xyz = [];
+        for l = 1:length(dxyz)
+            % if D(iD(h),1)+dxyz(l,1) > 0 && D(iD(h),2)+dxyz(l,2) > 0 && D(iD(h),3) + dxyz(l,3)&& D(iD(h),1)+dxyz(l,1)<= n_cells_x && D(iD(h),2)+dxyz(l,2) <= n_cells_y && D(iD(h),3) + dxyz(l,3) <= n_cells_z
+                if ~isempty(CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}) % Zelle gefüllt oder nicht
+                    while ~isempty(CellArray{D(iD(h),1),  D(iD(h),2), D(iD(h),3)}(1,1).Prev) % zurücksetzen
+                        CellArray{D(iD(h),1), D(iD(h),2), D(iD(h),3)}(1,1) = CellArray{D(iD(h),1), D(iD(h),2)}(1,1).Prev;
+                    end
+                    while isempty CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}
+                    
+                    while ~isempty(CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}(1,1).Next)
+                        xyz =[xyz; CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1).Next.coordinates];
+                        CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1) = CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1).Next;
+                    end
+                end
+            end
         end
+    n = size(xyz, 1);
+    F_neu = zeros(n,3);
+    F = zeros(n,3);
+    r = zeros(n,3);
+    for n = 1:n
+        r(n,:) = xyz(n,:)-coordinates(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
+        if norm(r(n,:)) > 2.5*sigma
+            r(n,:) = zeros(1,3);
+        end
+        F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
+        F = F_neu;
+        F(isnan(F_neu)) = 0;
     end
-end
-% reset ' pointer ' to initial :
-for i = 1:length(cells)
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev)
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev;
+    F_0(h,:) = sum(F, 1);
+    for i = 1:np_Teilchen
+        while ~isempty(CellArray{D(iD(i),1),  D(iD(i),2), D(iD(i),3)}(1,1).Prev)
+            CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1) = CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1).Prev;
         end
     end
 end
