@@ -70,141 +70,22 @@ for i = 1:length(D)
     CellArray{D(i,1), D(i,2), D(i,3)} = [particle_head(D(i,1),D(i,2),D(i,3)), CellArray_linear{i,1}]; % deepCopy damit unveränderlich
 end
 
+coordinates = coordinates_0;
+
 % Ausklamüsern
 
 %% Berechnung der Kräfte
-
-n_cells_x = size(CellArray, 1);
-n_cells_y = size(CellArray, 2);
-n_cells_z = size(CellArray, 3);
-
-x = -1:1;
-y = -1:1;
-z = -1:1;
-
-[X,Y,Z] = meshgrid(x,y,z);
-dxyz = [X(:), Y(:), Z(:)];
-
-
-x = 1:n_cells_x;
-y = 1:n_cells_y;
-z = 1:n_cells_z;
-
-[X,Y,Z] = meshgrid(x,y,z);
-cells = [X(:),Y(:),Z(:)]; % alle Zellkombinationen um loops zu sparen
-
-for h = 1:np_Teilchen
-    xyz = [];
-        for l = 1:length(dxyz)
-            % if D(iD(h),1)+dxyz(l,1) > 0 && D(iD(h),2)+dxyz(l,2) > 0 && D(iD(h),3) + dxyz(l,3)&& D(iD(h),1)+dxyz(l,1)<= n_cells_x && D(iD(h),2)+dxyz(l,2) <= n_cells_y && D(iD(h),3) + dxyz(l,3) <= n_cells_z
-                if ~isempty(CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}) % Zelle gefüllt oder nicht
-                    while ~isempty(CellArray{D(iD(h),1),  D(iD(h),2), D(iD(h),3)}(1,1).Prev) % zurücksetzen
-                        CellArray{D(iD(h),1), D(iD(h),2), D(iD(h),3)}(1,1) = CellArray{D(iD(h),1), D(iD(h),2)}(1,1).Prev;
-                    end
-                    while isempty CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}
-                    
-                    while ~isempty(CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}(1,1).Next)
-                        xyz =[xyz; CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1).Next.coordinates];
-                        CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1) = CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1).Next;
-                    end
-                end
-            end
-        end
-    n = size(xyz, 1);
-    F_neu = zeros(n,3);
-    F = zeros(n,3);
-    r = zeros(n,3);
-    for n = 1:n
-        r(n,:) = xyz(n,:)-coordinates(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
-        if norm(r(n,:)) > 2.5*sigma
-            r(n,:) = zeros(1,3);
-        end
-        F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
-        F = F_neu;
-        F(isnan(F_neu)) = 0;
-    end
-    F_0(h,:) = sum(F, 1);
-    for i = 1:np_Teilchen
-        while ~isempty(CellArray{D(iD(i),1),  D(iD(i),2), D(iD(i),3)}(1,1).Prev)
-            CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1) = CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1).Prev;
-        end
-    end
-end
-
-
-coordinates = [];
-F_0 = [];
-for i= 1:length(cells) % alle möglichen Zellen
-    k = 1;
-    F = [];
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next) % zum Zählen der Elemente pro linked list (pro Zelle, ungleich CellArray)
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next;
-            coordinates = [coordinates; currcell(k,:,cells(i,1),cells(i,2),cells(i,3))];
-            xyz = []; % clear xyz
-            for l = 1:length(dxyz)
-                % PBC!!
-                for j = 1:3
-                    if cells(i,j) + dxyz(l,j) <= 0
-                        dxyz(l,j) = dxyz(l,j) + size(CellArray,j);
-                    elseif cells(i,j) + dxyz(l,j) > size(CellArray,j)
-                        dxyz(l,j) = dxyz(l,j)-size(CellArray,j);
-                    end
-                end
-                xyz = [xyz; currcell(:,:,cells(i,1)+dxyz(l,1),cells(i,2)+dxyz(l,2), cells(i,3)+dxyz(l,3))]; % alle relevanten Koordinaten für Teilchen k in Zelle i
-            end
-            xyz(all(xyz == 0, 2),:) = [];
-            if size(xyz,1) == 1
-                F_total(k,:,cells(i,1),cells(i,2),cells(i,3)) = zeros(1,3);
-                break
-            end
-            n=size(xyz,1);
-            F_neu = zeros(n,3);
-            r = zeros(n,3);
-            for n = 1:size(xyz,1)
-                r(n,:) = xyz(n,:) - currcell(k,:,cells(i,1),cells(i,2), cells(i,3)); % Abstand zu jedem Teilchen k in Zelle ij (aus CellArray)
-                r(n,:) = r(n,:) - d.* round(r(n,:)./d); % PBC: wenn Abstand zu Teilchen in nächster Box kürzer
-
-                if norm(r(n,:)) > 2.5*sigma
-                    r(n,:) = zeros(1,3);
-                end
-                F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
-                F_neu(isnan(F_neu)) = 0;
-            end
-            F(k,:) = sum(F_neu, 1);
-            F_total(k,:,cells(i,1),cells(i,2),cells(i,3)) = F(k,:);
-            k = k+1;
-        end
-        F_0 = [F_0; F_total(:,:,cells(i,1),cells(i,2),cells(i,3))];
-    end
-end
-
-% F_0(all(F_0 == 0, 3), :) = [];
-
-% reset ' pointer ' to initial :
-for i = 1:length(cells)
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev)
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev;
-        end
-    end
-end
-
-
-
-
+F_0 = LJ_Kraft(CellArray, sigma, E, np_Teilchen, D, iD, coordinates);
 
 %% Velocity-Verlet
 tic
 
-
-n_steps = 1;
+delta_t = 2*delta_t;
+n_steps = 1e5;
 t = 0;
 % for i = 1:np_Teilchen
 %     v(i,:) = PL(i).velocities;
 % end
-v = zeros(np_Teilchen,3);
-delta_t = 1e-2;
 tau = delta_t*1e3;
 a = 4;
 
@@ -241,7 +122,7 @@ while t < delta_t*n_steps
         C_0(i,:) = ceil(PL(i).coordinates./(2.5*sigma)); % Position der Teilchen zuordnen
     end
  
-    while sum(bsxfun(@ge, zeros(length(C_0), 2), C_0), 'all') > 0
+    while sum(bsxfun(@ge, zeros(length(C_0), 3), C_0), 'all') > 0
         C_0 = C_0 + 1;
     end
 
@@ -251,15 +132,9 @@ while t < delta_t*n_steps
             PL(i).insertAfter(particle_head(C_0(i,1), C_0(i,2), C_0(i,3))); % neue Verknüpfung
         end
     end
-    F_0 = LJ_Kraft(CellArray, sigma, E, d);
 
-
-    % reset ' pointer ' to initial :
-    for i = 1:length(cells)
-        while ~isempty(particle_head(cells(i,1),cells(i,2)).Prev)
-            particle_head(cells(i,1),cells(i,2)) = particle_head(cells(i,1),cells(i,2)).Prev;
-        end
-    end  
+    F_old = F_0;
+    F_0 = LJ_Kraft(CellArray, sigma, E, np_Teilchen, D, iD, coordinates);
 
     v = v + bsxfun(@rdivide, (F_0+F_old), 2*m)*delta_t;
     E_pot = sum(LJ_Pot(coordinates, sigma, E, a))*0.5; % Korrektur: *0.5, für i~=j
@@ -293,20 +168,21 @@ toc
 
 
 %% Kraftberechnung
-F_ok = LJ_Kraft(CellArray, sigma, E, d);
+F_ok = LJ_Kraft(CellArray, sigma, E, np_Teilchen, D, iD, coordinates);
 
 %% Zeitintegration
-n_steps = 100;
+n_steps = 10;
 t = 0;
-v = zeros(np_Teilchen,2);
+v = zeros(np_Teilchen,3);
 delta_t = 1e-2;
 tau = delta_t*1e3;
 a = 4;
 
-[xyz_all, v_all] = Zeitintegration(CellArray, coordinates_0, t, delta_t, F_0, n_steps, v, m, sigma, E, np_Teilchen, a, tau);
+[xyz_all, v_all, F_all, E_pot_all, E_kin_all, T_all] = Zeitintegration(CellArray, coordinates, v, t, delta_t, F_0, n_steps, m, sigma, E, np_Teilchen, a, tau, d, C);
 
 %%
-Visualisierung(xyz_all, 'Film.avi')
+% Visualisierung(xyz_all, 'Film.avi')
+Generate_xyz(xyz_all, '402_PBC.xyz')
 
 %% Funktionen
 function [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter(Textdatei1)
@@ -394,7 +270,7 @@ end
 v = zeros(n,3);
 end
 
-function F_0 = LJ_Kraft(CellArray, sigma, E, d) %d
+function F_0 = LJ_Kraft(CellArray, sigma, E, np_Teilchen, D, iD, coordinates) %d
 % Berechnung der Kräfte
 
 n_cells_x = size(CellArray, 1);
@@ -406,100 +282,65 @@ y = -1:1;
 z = -1:1;
 
 [X,Y,Z] = meshgrid(x,y,z);
-dxyz = [X(:), Y(:), Z(:)];
 
-
-x = 1:n_cells_x;
-y = 1:n_cells_y;
-z = 1:n_cells_z;
-
-[X,Y,Z] = meshgrid(x,y,z);
-cells = [X(:),Y(:),Z(:)]; % alle Zellkombinationen um loops zu sparen
-
-currcell = [];
-for i = 1:length(cells)
-    k=1;
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next)
-            currcell(k,:,cells(i,1),cells(i,2),cells(i,3)) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next.coordinates;
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next;
-            k=k+1;
+for h = 1:np_Teilchen
+    xyz = [];
+    dxyz = [X(:), Y(:), Z(:)];
+    for l = 1:length(dxyz)
+        if D(iD(h),1)+dxyz(l,1) < 1
+            dxyz(l,1) = size(CellArray,1) - D(iD(h),1);
         end
-    end
-end
-% reset ' pointer ' to initial :
-for i = 1:length(cells)
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev)
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev;
+        if D(iD(h),2)+dxyz(l,2) < 1
+            dxyz(l,2) = size(CellArray,2) - D(iD(h),2);
         end
-    end
-end
-
-
-coordinates = [];
-F_0 = [];
-for i= 1:length(cells) % alle möglichen Zellen
-    k = 1;
-    F = [];
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next) % zum Zählen der Elemente pro linked list (pro Zelle, ungleich CellArray)
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Next;
-            coordinates = [coordinates; currcell(k,:,cells(i,1),cells(i,2),cells(i,3))];
-            xyz = []; % clear xyz
-            for l = 1:length(dxyz)
-                % PBC!!
-                for j = 1:3
-                    if cells(i,j) + dxyz(l,j) <= 0
-                        dxyz(l,j) = dxyz(l,j) + size(CellArray,j);
-                    elseif cells(i,j) + dxyz(l,j) > size(CellArray,j)
-                        dxyz(l,j) = dxyz(l,j)-size(CellArray,j);
-                    end
-                end
-                xyz = [xyz; currcell(:,:,cells(i,1)+dxyz(l,1),cells(i,2)+dxyz(l,2), cells(i,3)+dxyz(l,3))]; % alle relevanten Koordinaten für Teilchen k in Zelle i
+        if D(iD(h),3)+dxyz(l,3) < 1
+            dxyz(l,3) = size(CellArray,3) - D(iD(h),3);
+        end
+        if D(iD(h),1)+dxyz(l,1) > n_cells_x
+            dxyz(l,1) = 1 - D(iD(h),1);
+        end
+        if D(iD(h),2)+dxyz(l,2) > n_cells_y
+            dxyz(l,2) = 1 - D(iD(h),2);
+        end
+        if D(iD(h),3)+dxyz(l,3) > n_cells_z
+            dxyz(l,3) = 1 - D(iD(h),2);
+        end
+        if ~isempty(CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}) % Zelle gefüllt oder nicht
+            while ~isempty(CellArray{D(iD(h),1),  D(iD(h),2), D(iD(h),3)}(1,1).Prev) % zurücksetzen
+                CellArray{D(iD(h),1), D(iD(h),2), D(iD(h),3)}(1,1) = CellArray{D(iD(h),1), D(iD(h),2), D(iD(h),3)}(1,1).Prev;
             end
-            xyz(all(xyz == 0, 2),:) = [];
-            if size(xyz,1) == 1
-                F_total(k,:,cells(i,1),cells(i,2),cells(i,3)) = zeros(1,3);
-                break
+            while ~isempty(CellArray{D(iD(h),1)+dxyz(l,1),  D(iD(h),2)+dxyz(l,2), D(iD(h),3)+dxyz(l,3)}(1,1).Next)
+                xyz =[xyz; CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1).Next.coordinates];
+                CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1) = CellArray{D(iD(h),1) + dxyz(l,1) , D(iD(h),2) + dxyz(l,2), D(iD(h),3) + dxyz(l,3)}(1,1).Next;
             end
-            n=size(xyz,1);
-            F_neu = zeros(n,3);
-            r = zeros(n,3);
-            for n = 1:size(xyz,1)
-                r(n,:) = xyz(n,:) - currcell(k,:,cells(i,1),cells(i,2), cells(i,3)); % Abstand zu jedem Teilchen k in Zelle ij (aus CellArray)
-                r(n,:) = r(n,:) - d.* round(r(n,:)./d); % PBC: wenn Abstand zu Teilchen in nächster Box kürzer
-
-                if norm(r(n,:)) > 2.5*sigma
-                    r(n,:) = zeros(1,3);
-                end
-                F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
-                F_neu(isnan(F_neu)) = 0;
-            end
-            F(k,:) = sum(F_neu, 1);
-            F_total(k,:,cells(i,1),cells(i,2),cells(i,3)) = F(k,:);
-            k = k+1;
         end
-        F_0 = [F_0; F_total(:,:,cells(i,1),cells(i,2),cells(i,3))];
     end
-end
-
-% reset ' pointer ' to initial :
-for i = 1:length(cells)
-    if ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)})
-        while ~isempty(CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev)
-            CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1) = CellArray{cells(i,1),cells(i,2),cells(i,3)}(1,1).Prev;
+    n = size(xyz, 1);
+    F_neu = zeros(n,3);
+    F = zeros(n,3);
+    r = zeros(n,3);
+    for n = 1:n
+        r(n,:) = xyz(n,:)-coordinates(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
+%         if norm(r(n,:)) > 2.5*sigma
+%             r(n,:) = zeros(1,3);
+%         end
+        F_neu(n,:) = 24*E/sum(r(n,:).^2, 2) * sigma/((sum(r(n,:).^2, 2))^3) * (1-2*sigma^6/(sum(r(n,:).^2,2)^3)) * r(n,:);
+        F = F_neu;
+        F(isnan(F_neu)) = 0;
+    end
+    F_0(h,:) = sum(F, 1);
+    for i = 1:np_Teilchen
+        while ~isempty(CellArray{D(iD(i),1),  D(iD(i),2), D(iD(i),3)}(1,1).Prev)
+            CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1) = CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1).Prev;
         end
     end
 end
-
-
 end
 
 function E_pot_total = LJ_Pot(xyz, sigma, E, a)
 n = length(xyz);
 E_pot = zeros(n,1,n);
-r = zeros(n,2,n);
+r = zeros(n,3,n);
 E_pot_total = zeros(n,1);
 
 for i=1:n
@@ -512,7 +353,82 @@ end
 E_pot_total(:,:) = sum(E_korr, 3);
 end
 
+function [xyz_all, v_all, F_all, E_pot_all, E_kin_all, T_all] = Zeitintegration(CellArray, coordinates, v, t, delta_t, F_0, n_steps, m, sigma, E, np_Teilchen, a, tau,d,C);
 
+E_kin_all = zeros(n_steps,1);
+E_pot_all = zeros(n_steps,1);
+T_all = zeros(n_steps,1);
+
+iteration = 0;
+v_Betrag = zeros(length(coordinates), 1);
+T_0 = 50; % Zieltemperatur
+k_B = 3.1651e-06; % Boltzmann-Konstante in a. u.
+
+xyz_all = zeros(np_Teilchen, 3, n_steps);
+v_all = zeros(np_Teilchen, 3, n_steps);
+F_all = zeros(np_Teilchen, 3, n_steps);
+while t < delta_t*n_steps
+    t = t + delta_t;
+    iteration = iteration + 1;
+    coordinates = coordinates + delta_t*(v + F_0.*delta_t*0.5/m); % neue Positionen --> einordnen in Zellen, dann neue Kraftberechnung
+    for i = 1:size(coordinates, 1)
+        for j = 1:size(coordinates, 2)
+            if coordinates(i,j) >= d(j)
+                coordinates(i,j) = coordinates(i,j) - d(j);
+            elseif coordinates(i,j) < 0
+                coordinates(i,j) = coordinates(i,j) + d(j);
+            end
+        end
+    end
+
+    C_0 = zeros(np_Teilchen, 3);
+    for i = 1:np_Teilchen
+        PL(i).coordinates = coordinates(i,:); % Aktualisierung
+        PL(i).forces = F_0(i,:);
+        C_0(i,:) = ceil(PL(i).coordinates./(2.5*sigma)); % Position der Teilchen zuordnen
+    end
+ 
+    while sum(bsxfun(@ge, zeros(length(C_0), 3), C_0), 'all') > 0
+        C_0 = C_0 + 1;
+    end
+
+    for i = 1:np_Teilchen
+        if C_0(i,:)/ C(i,:) ~= 1
+            PL(i).removeNode;
+            PL(i).insertAfter(particle_head(C_0(i,1), C_0(i,2), C_0(i,3))); % neue Verknüpfung
+        end
+    end
+
+    F_old = F_0;
+    F_0 = LJ_Kraft(CellArray, sigma, E, np_Teilchen, D, iD, coordinates);
+
+    v = v + bsxfun(@rdivide, (F_0+F_old), 2*m)*delta_t;
+    E_pot = sum(LJ_Pot(coordinates, sigma, E, a))*0.5; % Korrektur: *0.5, für i~=j
+
+    % Temperaturkontrolle über Skalierung der Geschwindigkeiten mithilfe
+    % des Skalierungsfaktors lambda
+    for i = 1:size(coordinates,1)
+        v_Betrag(i,1) = norm(v(i,:));
+    end
+
+
+    E_kin = sum(.5*m*(v_Betrag.^2))*0.5; % Korrektur: *0.5, da i~=j
+    T = 2*E_kin./(3*np_Teilchen*k_B);
+    lambda = sqrt(1+delta_t/tau*((T_0./T)-1));
+    v = v.*lambda;
+
+    for i = 1:np_Teilchen
+        PL(i).velocities = v(i,:);
+    end
+
+    xyz_all(:, :, iteration) = coordinates(:, :);
+    v_all(:,:,iteration) = v(:,:);
+    F_all(:,:,iteration) = F_0(:,:);
+    E_pot_all(iteration,:) = E_pot;
+    E_kin_all(iteration,:) = E_kin;
+    T_all(iteration,:) = T;
+end
+end
 
 
 function Visualisierung(xyz_all, Dateiname)
@@ -530,5 +446,22 @@ for i = 1:size(xyz_all,3)
     writeVideo(v, M);
 end
 close(v);
+end
+
+function Generate_xyz(M, Dateiname)
+% Output als xyz Datei
+n = size(M, 1);
+Atomanzahl = repmat({'Ar'},n,1);
+fileID = fopen(Dateiname, 'w'); 
+
+for i=1:size(M,3)
+    fprintf(fileID, '%d\n', n);
+    fprintf(fileID, 'Moleküldynamik_3D\n');
+    for j = 1:n
+        fprintf(fileID, '%s %f %f %f\n', Atomanzahl{j}, M(j,1,i), M(j,2,i), M(j,3,i));
+    end
+end
+
+fclose(fileID);
 end
 
