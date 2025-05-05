@@ -19,20 +19,26 @@
 % Parameter importieren, https://docs.lammps.org/Howto_tip3p.html
 mass_O = 15.9994; % amu
 mass_H = 1.008;
-q_O = -0.834; % e
-q_H = 0.417;
-epsilon_OO = 0.1521; % kcal/mole
+q_O = -0.834 * 1.602e-19; % e
+q_H = 0.417 * 1.602e-19;
+
+N_A = 6.022e23;
+epsilon_OO = 0.1521 * 1/N_A * 4.184; % kcal/mole to kJ
 sigma_OO = 3.1507; % Angström
-epsilon_HH = 0.0;
+epsilon_HH = 0.0 * 1/N_A * 4.184;
 sigma_HH = 1.0;
-epsilon_OH = 0.0;
+epsilon_OH = 0.0 * 1/N_A * 4.184;
 sigma_OH = 1.0;
 K_OH = 450; % kcal/mole/A², bond, Federkonstante
 r0_OH = 0.9572; % A
 K_HOH = 55.0; % kcal/mole, angle
 theta0_HOH = 104.52;
 
+epsilon_0 =8.86e-22*1e3; % C²/(N*Angstrom²)
+skal = 1/(4*pi*epsilon_0);
+G = 0.35; % Parameter der Gaußschen Glockenkurve / A⁻¹
 a = 4;
+
 Atome_dim = 3;
 
 % Teilchen in Box
@@ -127,9 +133,6 @@ coordinates = coordinates_0;
 
 %% Energieberechnung
 
-G = 0.7; % Parameter der Gaußschen Glockenkurve
-skal = 1; % Skalierung, 1/(4*pi*epsilon_0)
-
 n_cells_x = size(CellArray, 1);
 n_cells_y = size(CellArray, 2);
 n_cells_z = size(CellArray, 3);
@@ -175,38 +178,29 @@ for h = 1:np_Teilchen
         end
     end
     n = size(xyz, 1);
-    E_neu = zeros(n,1);
     r = zeros(n,4);
+    r_betrag = zeros(n,1);
+    E_neu = zeros(n,1);
     for i = 1:n
-        r(i,:) = xyz(i,:)-coordinates(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
-        if norm(r(i,:)) > 2.5*sigma_OO
-            r(i,:) = zeros(1,4);
+        r(i,:) = xyz(i,:)-xyz(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
+        r_betrag(i) = norm(r(i,2:4));
+    end
+    for i = 1:n
+        if r_betrag(i) > 2.5*sigma_OO
+            E_neu(i) = 0;
+            continue
         end
-        if coordinates(h,1) == q_O && r(i,1) == 0
-            E_neu(i) = a*epsilon_OO*(((sigma_OO.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OO.^12)./((sum(r(i, 2:4).^2,2).^6)))) + q_O^2*erfc(G*norm(r(i,2:4))/norm(r(i,2:4)));
-        elseif coordinates(h,1) == q_O && r(i,1) ~= 0 || coordinates(h,1) == q_H && r(i,1) ~= 0
-            E_neu(i) = a*epsilon_OH*(((sigma_OH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + q_O*q_H*erfc(G*norm(r(i,2:4))/norm(r(i,2:4)));
-        elseif coordinates(h,1) == q_H && r(i,1) == 0
-            E_neu(i) = a*epsilon_HH*(((sigma_HH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_HH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + q_H^2*erfc(G*norm(r(i,2:4))/norm(r(i,2:4)));
+        if r_betrag(i) == 0
+            E_neu(i) = 0;
+        elseif xyz(h,1) == q_O && r(i,1) == 0
+            E_neu(i) = a*epsilon_OO*(((sigma_OO.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OO.^12)./((sum(r(i, 2:4).^2,2).^6)))) + .5*skal*q_O^2*erfc(G*r_betrag(i))/r_betrag(i);
+        elseif xyz(h,1) == q_O && r(i,1) ~= 0 || xyz(h,1) == q_H && r(i,1) ~= 0
+            E_neu(i) = a*epsilon_OH*(((sigma_OH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + .5*skal*q_O*q_H*erfc(G*r_betrag(i))/r_betrag(i);
+        elseif xyz(h,1) == q_H && r(i,1) == 0
+            E_neu(i) = a*epsilon_HH*(((sigma_HH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_HH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + .5*skal*q_H^2*erfc(G*r_betrag(i))/r_betrag(i);
         end
-        E_neu(isnan(E_neu)) = 0;
     end
     E_kr(h,:) = sum(E_neu, 1);
-%     F_kr = zeros(n,3);
-%     r_betrag = zeros(n,1);
-%     for i = 1:n
-%         r_betrag(i) = norm(r(i,2:4));
-%         if coordinates(h,1) == q_O && r(i,1) == 0
-%             F_kr(i,:) = skal*q_O^2*(erfc(G*r_betrag(i))/r_betrag(i)+ 2*G/sqrt(pi)*exp(-(G^2*r_betrag(i)^2)/sum(r(i,2:4).^2, 2))*r(i,2:4));
-%         elseif coordinates(h,1) == q_O && r(i,1) ~= 0 || coordinates(i,1) == q_H && r(i,1) ~= 0
-%             F_kr(i,:) = skal*q_O*q_H*(erfc(G*r_betrag(i))/r_betrag(i)+ 2*G/sqrt(pi)*exp(-(G^2*r_betrag(i)^2)/sum(r(i,2:4).^2, 2))*r(i,2:4));
-%         elseif coordinates(h,1) == q_H && r(i,1) == 0
-%             F_kr(i,:) = skal*q_H^2*(erfc(G*r_betrag(i))/r_betrag(i)+ 2*G/sqrt(pi)*exp(-(G^2*r_betrag(i)^2)/sum(r(i,2:4).^2, 2))*r(i,2:4));
-%         end
-% %     F_neu(isinf(F_neu)) = 0;
-% %     F_neu(isnan(F_neu)) = 0;
-%     F_kurz(h,:) = sum(F_kr, 1);
-%     end
     for i = 1:np_Teilchen
         while ~isempty(CellArray{D(iD(i),1),  D(iD(i),2), D(iD(i),3)}(1,1).Prev)
             CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1) = CellArray{D(iD(i),1), D(iD(i),2), D(iD(i),3)}(1,1).Prev;

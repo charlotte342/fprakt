@@ -11,29 +11,29 @@
 % Parameter importieren, https://docs.lammps.org/Howto_tip3p.html
 mass_O = 15.9994; % amu
 mass_H = 1.008;
-q_O = -0.834; % e
-q_H = 0.417;
+q_O = -0.834 * 1.602e-19; % e
+q_H = 0.417 * 1.602e-19;
 
 N_A = 6.022e23;
-epsilon_OO = 0.1521 * 1/N_A; % kcal/mole
+epsilon_OO = 0.1521 * 1/N_A * 4.184; % kcal/mole to kJ
 sigma_OO = 3.1507; % Angström
-epsilon_HH = 0.0 * 1/N_A;
+epsilon_HH = 0.0 * 1/N_A * 4.184;
 sigma_HH = 1.0;
-epsilon_OH = 0.0 * 1/N_A;
+epsilon_OH = 0.0 * 1/N_A * 4.184;
 sigma_OH = 1.0;
 K_OH = 450; % kcal/mole/A², bond, Federkonstante
 r0_OH = 0.9572; % A
 K_HOH = 55.0; % kcal/mole, angle
 theta0_HOH = 104.52;
 
-epsilon_0 =8.86e-22; % C²/(N*A²)
+epsilon_0 =8.86e-22*1e3; % C²/(N*Angstrom²)
 skal = 1/(4*pi*epsilon_0);
 a = 4;
 Atome_dim = 0;
 i = 0;
 E_pot_all = zeros(8,1);
 Anz_Mol = zeros(8,1);
-E_pro_Mol = zeros(8,1);
+E_pro_Molekuel = zeros(8,1);
 while Atome_dim < 8
     Atome_dim = Atome_dim + 1;
     i = i+1;
@@ -65,24 +65,18 @@ while Atome_dim < 8
     E_pot = Energie(coordinates_0, sigma_OO, sigma_OH, sigma_HH, epsilon_OO, epsilon_OH, epsilon_HH,a, skal, q_O, q_H);
     E_pot_all(i) = E_pot;
     Anz_Mol(i) = length(coordinates_O);
-    E_pro_Mol(i) = E_pot/Anz_Mol(i);
+    E_pro_Molekuel(i) = E_pot/Anz_Mol(i);
 end
 
 
 figure;
-for i = 1:length(E_pro_Mol)
-    plot(Anz_Mol(i), E_pro_Mol(i), 'bx-', 'LineWidth', 1.5);
+for i = 1:length(E_pro_Molekuel)
+    plot(Anz_Mol(i), E_pro_Molekuel(i), 'b*-', 'LineWidth', 1.5);
     hold on
 end
 
 title(['Energie pro Molekül']);
 xlabel('Anzahl an Molekülen'); ylabel('Energie / kJ'); grid on;
-
-%% Energieberechnung
-
-G = 0.7; % Parameter der Gaußschen Glockenkurve
-skal = 1; % Skalierung, 1/(4*pi*epsilon_0)
-
 
 
 %% Funktionen
@@ -147,20 +141,21 @@ for h = 1:n
     for i = 1:n
         r(i,:) = xyz(i,:)-xyz(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
         r_betrag(i) = norm(r(i,2:4));
-        if r_betrag(i) > 2.5*sigma_OO
-            r_betrag(i) = 0;
-        end
     end
     for i = 1:n
-        if xyz(h,1) == q_O && r(i,1) == 0
-            E_neu(i) = (1/4.18400*a*epsilon_OO*(((sigma_OO.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OO.^12)./((sum(r(i, 2:4).^2,2).^6))))) + skal*q_O^2/r_betrag(i);
-        elseif xyz(h,1) == q_O && r(i,1) ~= 0 || xyz(h,1) == q_H && r(i,1) ~= 0
-            E_neu(i) = (1/4.18400*a*epsilon_OH*(((sigma_OH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OH.^12)./((sum(r(i, 2:4).^2,2).^6))))) + skal*q_O*q_H/r_betrag(i);
-        elseif xyz(h,1) == q_H && r(i,1) == 0
-            E_neu(i) = (1/4.18400*a*epsilon_HH*(((sigma_HH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_HH.^12)./((sum(r(i, 2:4).^2,2).^6))))) + skal*q_H^2/r_betrag(i);
+        if r_betrag(i) > 2.5*sigma_OO
+            E_neu(i) = 0;
+            continue
         end
-        E_neu(isnan(E_neu)) = 0;
-        E_neu(isinf(E_neu)) = 0;
+        if r_betrag(i) == 0
+            E_neu(i) = 0;
+        elseif xyz(h,1) == q_O && r(i,1) == 0
+            E_neu(i) = a*epsilon_OO*(((sigma_OO.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OO.^12)./((sum(r(i, 2:4).^2,2).^6)))) + skal*q_O^2/r_betrag(i);
+        elseif xyz(h,1) == q_O && r(i,1) ~= 0 || xyz(h,1) == q_H && r(i,1) ~= 0
+            E_neu(i) = a*epsilon_OH*(((sigma_OH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + skal*q_O*q_H/r_betrag(i);
+        elseif xyz(h,1) == q_H && r(i,1) == 0
+            E_neu(i) = a*epsilon_HH*(((sigma_HH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_HH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + skal*q_H^2/r_betrag(i);
+        end
     end
     E_kr(h,:) = sum(E_neu, 1);
 end
