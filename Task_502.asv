@@ -145,7 +145,7 @@ z = -1:1;
 E_kr = zeros(np_Teilchen, 1);
 F_kurz = zeros(np_Teilchen, 3);
 % rho = zeros(np_Teilchen, np_Teilchen);
-rho = zeros(h,3);
+rho = zeros(h,1);
 rho_LC = [];
 for h = 1:np_Teilchen
     xyz = [];
@@ -183,15 +183,14 @@ for h = 1:np_Teilchen
     r = zeros(n,4);
     r_betrag = zeros(n,1);
     E_neu = zeros(n,1);
-    rho_tilde = zeros(n,3);
+    rho_tilde = zeros(n,1);
 
     for i = 1:n
         r(i,:) = xyz(i,:)-xyz(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
         r_betrag(i) = norm(r(i,2:4));
-        rho_tilde(i,:) = xyz(i,1)*(G/pi)^3*exp(-G^2*r(i,2:4).^2);
-        rho_tilde_2(:,i)
+        rho_tilde(i) = xyz(i,1)*(G/pi)^3*exp(-G^2.*r(i,2:4)^2);
     end
-    rho(h,:) = sum(rho_tilde,1); % Ladungsdichte an jedem Punkt h
+    rho(h) = sum(rho_tilde,1); % Ladungsdichte an jedem Punkt h
     for i = 1:n
         if r_betrag(i) > 2.5*sigma_OO
             E_neu(i) = 0;
@@ -224,7 +223,7 @@ E_pot = .5*sum(E_kr,1);
 %     hold on
 % end
 
-surf(rho, coordinates_0(:,2:4))
+surf(coordinates_0(:,2:3), rho)
 %%
 figure;
 for i = 1:length(xyz)
@@ -588,6 +587,3 @@ end
 
 fclose(fileID);
 end
-
-function rho_tilde = Gauss(X, G, C)
-rho_tilde = 

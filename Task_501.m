@@ -69,6 +69,7 @@ while Atome_dim < 8
 end
 
 
+
 figure;
 for i = 1:length(E_pro_Molekuel)
     plot(Anz_Mol(i), E_pro_Molekuel(i), 'b*-', 'LineWidth', 1.5);
