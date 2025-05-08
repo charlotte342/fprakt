@@ -28,9 +28,9 @@ skal = 1/(4*pi*epsilon_0);
 G = 0.35; % Parameter der Gaußschen Glockenkurve / A⁻¹
 a = 4;
 
+%% Teilchen in Box
 Atome_dim = 2;
 
-% Teilchen in Box
 x = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
 y = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
 z = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
@@ -56,9 +56,6 @@ np_hydrogen = length(coordinates_H);
 
 coordinates_0 = [coordinates_O; repmat(q_H, np_hydrogen, 1), coordinates_H];
 np_Teilchen = length(coordinates_0);
-%%
-[coordinates_0, v, d] = Initialisierung_PBC(d_x*i, d_y*i, d_z*i, np_Teilchen*i, sigma_OO, theta0_HOH, r0_OH, q_O, q_H);
-[V_LJ, V_Coulomb] = Energie(coordinates_0, sigma_OO, sigma_OH, sigma_HH, epsilon_OO, epsilon_OH, epsilon_HH,a, skal, q_O, q_H);
 
 %% Linked Particle List:
 % Array mit N_cell, Aufruf der einzelnen Zellen mit N_cell(x,y)
@@ -175,7 +172,7 @@ for h = 1:np_Teilchen
     E = zeros(n,1); % Hilfe für E_kr
 
     for i = 1:n
-        r(i,:) = xyz(i,:)-xyz(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
+        r(i,:) = xyz(i,:)-coordinates_0(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
         r_betrag(i) = norm(r(i,2:4));
     end
     for i = 1:n
@@ -186,13 +183,13 @@ for h = 1:np_Teilchen
         if r_betrag(i) == 0
             E_neu(i) = 0;
             E(i) = 0;
-        elseif xyz(h,1) == q_O && r(i,1) == 0
+        elseif coordinates_0(h,1) == q_O && r(i,1) == 0
             E_neu(i) = a*epsilon_OO*((sigma_OO.^12)./((sum(r(i, 2:4).^2,2).^6))-(sigma_OO.^6)./(sum(r(i,2:4).^2,2).^3));
             E(i) = .5*skal*q_O^2*erfc(G*r_betrag(i))/r_betrag(i);
-        elseif xyz(h,1) == q_O && r(i,1) ~= 0 || xyz(h,1) == q_H && r(i,1) ~= 0
+        elseif coordinates_0(h,1) == q_O && r(i,1) ~= 0 || coordinates_0(h,1) == q_H && r(i,1) ~= 0
             E_neu(i) = a*epsilon_OH*((-sigma_OH.^6)./(sum(r(i,2:4).^2,2).^3)+(sigma_OH.^12)./((sum(r(i, 2:4).^2,2).^6)));
             E(i)= .5*skal*q_O*q_H*erfc(G*r_betrag(i))/r_betrag(i);
-        elseif xyz(h,1) == q_H && r(i,1) == 0
+        elseif coordinates_0(h,1) == q_H && r(i,1) == 0
             E_neu(i) = a*epsilon_HH*((-sigma_HH.^6)./(sum(r(i,2:4).^2,2).^3)+(sigma_HH.^12)./((sum(r(i, 2:4).^2,2).^6)));
             E(i) = .5*skal*q_H^2*erfc(G*r_betrag(i))/r_betrag(i);
         end
@@ -211,9 +208,23 @@ V_kr = .5*sum(E,1);
 %% langreichweitiger Term
 
 E = zeros(np_Teilchen, 3);
-L = 11; % Boxlänge
+L = 4*1.5*sigma_OO; % Boxlänge
 n = -1*round(.5*np_Teilchen); % n Element Z
 m = 0; % Laufindex
+
+% Interpolation on grid
+x = 0:2:L;
+y = 0:2:L;
+z = 0:2:L;
+[X,Y,Z] = meshgrid(x,y,z);
+grid_points = [X(:),Y(:),Z(:)];
+no_gp = length(grid_points);
+
+% new_coord = zeros(np_Teilchen, 4);
+% for h = 1:np_Teilchen
+%     new_coord(h,:) = [coordinates_0(h,1), round(coordinates_0(h,2:4)./0.1)];
+% end
+
 while n < round(.5*np_Teilchen) % nr = nk
     n = n+1;
     k = (2*pi)/L * n;
@@ -222,19 +233,21 @@ while n < round(.5*np_Teilchen) % nr = nk
         E(m,:) = zeros(1,3);
         continue
     end
-    rho_x = zeros(i,1);
-    rho_y = zeros(i,1);
-    rho_z = zeros(i,1);
-    for i = 1:np_Teilchen
-        rho_x(i) = coordinates_0(i,1) * exp(1j*k*coordinates_0(i,2));
-        rho_y(i) = coordinates_0(i,1) * exp(1j*k*coordinates_0(i,3));
-        rho_z(i) = coordinates_0(i,1) * exp(1j*k*coordinates_0(i,4));
+    rho = zeros(no_gp, 3);
+    for h = 1:np_Teilchen
+        for i = 1:no_gp
+            if round(coordinates_0(h,2:4)./2) == grid_points(i,:)
+                rho(i,1) = (G/pi)*coordinates_0(h,1) * exp(1j*k*grid_points(i,1));
+                rho(i,2) = (G/pi)*coordinates_0(h,1) * exp(1j*k*grid_points(i,2));
+                rho(i,3) = (G/pi)*coordinates_0(h,1) * exp(1j*k*grid_points(i,3));
+            else
+                rho(i,:) = zeros(1,3);
+            end
+        end
     end
-    E(m,1) = 1/(epsilon_0*k^2) * norm(sum(rho_x,1))^2*exp(-k^2/(4*G^2));
-    E(m,2) = 1/(epsilon_0*k^2) * norm(sum(rho_y,1))^2*exp(-k^2/(4*G^2));
-    E(m,3) = 1/(epsilon_0*k^2) * norm(sum(rho_z,1))^2*exp(-k^2/(4*G^2));
+%     E(m,:) = 1/(epsilon_0*k^2) * norm(fftn(rho))^2*exp(-k^2/(4*G^2));
 end
-V_lr = 1/(2*L^3) * sum((skal.*E(:,:)), "all");
+V_lr = 1/(2*L^3) * sum((E(:,:)), "all");
 
 %% Selbstwechselwirkung
 E_self = zeros(np_Teilchen,1);
@@ -275,7 +288,6 @@ end
 
 fclose(fileID);
 end
-
 
 function [coordinates_0, v, d, np_Teilchen] = Initialisierung_PBC(d_x, d_y, d_z, np_Teilchen, sigma_OO, theta0_HOH, r0_OH, q_O, q_H)
 % Initialisierung

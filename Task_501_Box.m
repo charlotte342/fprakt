@@ -1,9 +1,6 @@
-%%%%%%%%%%
-% TIP3P  %
-%%%%%%%%%%
-
-% größer werdende Systeme, Energie konvergiert nicht wegen
-% langreichweitiger Artefakte
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Wasser - naive Coulombimplementierung %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Anfangsbedingungen: 3D-System, Positionen aus 3.3 importiert
 % N_cell = N_cell,x * N_cell,y (r_cut = 2.5*sigma)
@@ -26,48 +23,26 @@ r0_OH = 0.9572; % A
 K_HOH = 55.0; % kcal/mole, angle
 theta0_HOH = 104.52;
 
-epsilon_0 = 8.86e-22*1e3; % C²/(N*Angstrom²)
+epsilon_0 =8.86e-22*1e3; % C²/(N*Angstrom²)
 skal = 1/(4*pi*epsilon_0);
+G = 0.35; % Parameter der Gaußschen Glockenkurve / A⁻¹
 a = 4;
-Atome_dim = 0;
-i = 0;
-E_pot_all = zeros(8,1);
-Anz_Mol = zeros(8,1);
-E_pro_Molekuel = zeros(8,1);
-while Atome_dim < 8
-    Atome_dim = Atome_dim + 1;
-    i = i+1;
-    % Teilchen in Box
-    x = 0 : 2*sigma_OO : 2*sigma_OO*Atome_dim;
-    y = 0 : 2*sigma_OO : 2*sigma_OO*Atome_dim;
-    z = 0 : 2*sigma_OO : 2*sigma_OO*Atome_dim;
-    [X,Y,Z] = meshgrid(x,y,z);
 
-    coordinates_O = [X(:), Y(:), Z(:)];
-    np_oxygen = length(coordinates_O);
-    coordinates_O = [repmat(q_O, np_oxygen, 1), coordinates_O];
+E_pot_all = zeros(10,1);
+Anz_Mol = zeros(10,1);
+E_pro_Molekuel = zeros(10,1);
+d_x = 30;
+d_y = 30;
+d_z = 30;
+np_Teilchen = 10;
 
-    u = 0 - r0_OH : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
-    v = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
-    w = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
-    [U,V,W] = meshgrid(u,v,w);
-
-    q = 0 - cos(theta0_HOH - 90)*r0_OH : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim - cos(theta0_HOH - 90)*r0_OH;
-    r = 0 + sin(theta0_HOH - 90)*r0_OH : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim + sin(theta0_HOH - 90)*r0_OH;
-    s = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
-    [Q,R,S] = meshgrid(q,r,s);
-
-    coordinates_H = [U(:), V(:), W(:); Q(:), R(:), S(:)];
-    np_hydrogen = length(coordinates_H);
-
-    coordinates_0 = [coordinates_O; repmat(q_H, np_hydrogen, 1), coordinates_H];
-    np_Teilchen = length(coordinates_0);
+for i = 1:10
+    [coordinates_0, v, d] = Initialisierung_PBC(d_x*i, d_y*i, d_z*i, np_Teilchen*i, sigma_OO, theta0_HOH, r0_OH, q_O, q_H);
     [V_LJ, V_Coulomb] = Energie(coordinates_0, sigma_OO, sigma_OH, sigma_HH, epsilon_OO, epsilon_OH, epsilon_HH,a, skal, q_O, q_H);
     E_pot_all(i) = V_LJ + V_Coulomb;
-    Anz_Mol(i) = length(coordinates_O);
+    Anz_Mol(i) = np_Teilchen*i;
     E_pro_Molekuel(i) = E_pot_all(i)/Anz_Mol(i);
 end
-
 
 
 figure;
@@ -81,9 +56,44 @@ xlabel('Anzahl an Molekülen'); ylabel('Energie / kJ'); grid on;
 
 
 %% Funktionen
+function [a, sigma, E, m, t, delta_t, n_steps, t_end] = Parameter(Textdatei1)
+% Daten importieren
+fileID = fopen(Textdatei1);
+while ~feof(fileID)
+    line = fgets(fileID); % Zeile für Zeile Datei durchgehen
+    % 1. Integrator bestimmen
+    if contains (line, 'Integrator')
+        integrator = strtrim(strrep(line, 'Integrator: ', '')); % string trim, strrep: find and replace substring
+    elseif contains(line, 'dt')
+        delta_t = str2double(strtrim(strrep(line, 'dt: ', '')));
+    elseif contains(line, 'n_steps')
+        n_steps = str2double(strtrim(strrep(line, 'n_steps: ', '')));
+        t_end = delta_t*n_steps;
+    end
+    if strcmp(integrator,'Runge-Kutta') == 1 % strcmp: compare strings
+        if contains(line, 'Order')
+            Order = str2double(strtrim(strrep(line, 'Order: ', '')));
+        end
+    end
+    % 2. Force-Field
+    if contains(line, 'Force-Field')
+        FF = strtrim(strrep(line, 'Force-Field: ', ''));
+    elseif contains(line, 'alpha')
+        a = str2double(strtrim(strrep(line, 'alpha: ', '')));
+    elseif contains(line, 'sigma')
+        sigma = str2double(strtrim(strrep(line, 'sigma: ', '')));
+    elseif contains(line, 'E')
+        E = str2double(strtrim(strrep(line, 'E: ', '')));
+    elseif contains(line, 'Masse')
+        m = str2double(strtrim(strrep(line, 'Masse: ', '')));
+    end
+    
+end
+t = 0;
+fileID = fclose(fileID);
+end
 
-
-function [xyz, v, d, np_Teilchen] = Initialisierung_PBC(d_x, d_y, d_z, np_Teilchen, sigma)
+function [coordinates_0, v, d, np_Teilchen] = Initialisierung_PBC(d_x, d_y, d_z, np_Teilchen, sigma_OO, theta0_HOH, r0_OH, q_O, q_H)
 % Initialisierung
 % zentrierte Box
 d = [d_x, d_y, d_z];
@@ -94,40 +104,36 @@ r_betrag = zeros(np_Teilchen,1,np_Teilchen);
 % Initialisierte Zufallszahlen mit 1239465719 für Vergleichbarkeit mit rng
 rng(1239465719);
 xyz_0 = rand (np_Teilchen, 3); % rand: Zufallszahlen zwischen 0 und 1
+np_oxygen = length(xyz_0);
+coordinates_O = bsxfun(@minus, bsxfun(@times, xyz_0, d), 0.5*d); % Zufallszahlen im Intervall von d
+
 n = length(xyz_0);
-xyz = bsxfun(@minus, bsxfun(@times, xyz_0, d), 0.5*d); % Zufallszahlen im Intervall von d
 
 % r_min implementieren
 for i = 1:n
-    r(:,:,i) = bsxfun(@minus, xyz, xyz(i,:));
+    r(:,:,i) = bsxfun(@minus, coordinates_O, coordinates_O(i,:));
     r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d); % PBC: wenn Abstand zu Teilchen in nächster Box kürzer
 end
 for i = 1:n
     for j = i:n
         r_betrag(j,1,i) = norm(r(j,:,i));
         r_betrag(i,1,j) = r_betrag(j,1,i);
-        r_betrag(j,1,j) = sigma;
-        while r_betrag(j,1,i) < sigma
+        r_betrag(j,1,j) = 2*sigma_OO;
+        while r_betrag(j,1,i) < 2*sigma_OO
             xyz_0(j,:) = rand(1,3);
-            xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
-            r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
+            coordinates_O(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
+            r(:,:,i) = bsxfun(@minus, coordinates_O(i,:), coordinates_O);
             r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
             r_betrag(j,1,i) = norm(r(j,:,i));
             r_betrag(i,1,j) = r_betrag(j,1,i);
         end
     end
 end     
-for i = 1:n
-    for j = i:n
-        while r_betrag(j,1,i) < sigma
-            xyz_0(j,:) = rand(1,3);
-            xyz(j,:) = bsxfun(@minus, bsxfun(@times, xyz_0(j,:), d), 0.5*d);
-            r(:,:,i) = bsxfun(@minus, xyz(i,:), xyz);
-            r(:,:,i) = r(:,:,i) - d.* round(r(:,:,i)./d);
-            r_betrag(j,1,i) = norm(r(j,:,i));
-        end
-    end
+for i = 1:np_oxygen
+    coordinates_H(i,:) = [coordinates_O(i,1) - cos(theta0_HOH - 90) * r0_OH, coordinates_O(i,2) + sin(theta0_HOH - 90)*r0_OH, coordinates_O(i,3)];
+    coordinates_H(np_oxygen+i,:) = [coordinates_O(i,1) - r0_OH, coordinates_O(i,2:3)];
 end
+coordinates_0 = [repmat(q_O, np_oxygen, 1), coordinates_O; repmat(q_H, 2*np_oxygen, 1), coordinates_H];
 v = zeros(n,3);
 end
 
@@ -171,23 +177,6 @@ V_Coulomb = .5*sum(E_Coulomb,1);
 
 end
 
-function Visualisierung(xyz_all, Dateiname)
-% Visualisierung in matlab mithilfe von VideoWriter
-v = VideoWriter(Dateiname);
-open(v);
-figure;
-for i = 1:size(xyz_all,3)
-%     xyz_i = xyz_all(:, :, i);
-    clf;
-    plot(xyz_all(:, 1, i), xyz_all(:, 2, i), 'o', 'MarkerSize', 6);
-    title('Moleküldynamik');
-    xlabel('X'); ylabel('Y'); zlabel('Z'); grid on;
-    M = getframe(gcf);
-    writeVideo(v, M);
-end
-close(v);
-end
-
 function Generate_xyz(M, Dateiname, q_O, q_H)
 % Output als xyz Datei
 n = size(M, 1);
@@ -213,3 +202,6 @@ end
 
 fclose(fileID);
 end
+
+
+

@@ -26,7 +26,7 @@ r0_OH = 0.9572; % A
 K_HOH = 55.0; % kcal/mole, angle
 theta0_HOH = 104.52;
 
-epsilon_0 =8.86e-22*1e3; % C²/(N*Angstrom²)
+epsilon_0 = 8.86e-22*1e3; % C²/(N*Angstrom²)
 skal = 1/(4*pi*epsilon_0);
 a = 4;
 Atome_dim = 0;
@@ -38,9 +38,9 @@ while Atome_dim < 8
     Atome_dim = Atome_dim + 1;
     i = i+1;
     % Teilchen in Box
-    x = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
-    y = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
-    z = 0 : 1.5*sigma_OO : 1.5*sigma_OO*Atome_dim;
+    x = 0 : 2*sigma_OO : 2*sigma_OO*Atome_dim;
+    y = 0 : 2*sigma_OO : 2*sigma_OO*Atome_dim;
+    z = 0 : 2*sigma_OO : 2*sigma_OO*Atome_dim;
     [X,Y,Z] = meshgrid(x,y,z);
 
     coordinates_O = [X(:), Y(:), Z(:)];
@@ -62,10 +62,10 @@ while Atome_dim < 8
 
     coordinates_0 = [coordinates_O; repmat(q_H, np_hydrogen, 1), coordinates_H];
     np_Teilchen = length(coordinates_0);
-    E_pot = Energie(coordinates_0, sigma_OO, sigma_OH, sigma_HH, epsilon_OO, epsilon_OH, epsilon_HH,a, skal, q_O, q_H);
-    E_pot_all(i) = E_pot;
+    [V_LJ, V_Coulomb] = Energie(coordinates_0, sigma_OO, sigma_OH, sigma_HH, epsilon_OO, epsilon_OH, epsilon_HH,a, skal, q_O, q_H);
+    E_pot_all(i) = V_LJ + V_Coulomb;
     Anz_Mol(i) = length(coordinates_O);
-    E_pro_Molekuel(i) = E_pot/Anz_Mol(i);
+    E_pro_Molekuel(i) = E_pot_all(i)/Anz_Mol(i);
 end
 
 
@@ -131,37 +131,43 @@ end
 v = zeros(n,3);
 end
 
-function E_pot = Energie(xyz, sigma_OO, sigma_OH, sigma_HH, epsilon_OO, epsilon_OH, epsilon_HH,a, skal, q_O, q_H)
+function [V_LJ, V_Coulomb] = Energie(xyz, sigma_OO, sigma_OH, sigma_HH, epsilon_OO, epsilon_OH, epsilon_HH,a, skal, q_O, q_H)
 n = length(xyz);
-E_kr = zeros(n,1);
+E_LJ = zeros(n,1);
+E_Coulomb = zeros(n,1);
 
 for h = 1:n
     r = zeros(n,4);
     r_betrag = zeros(n,1);
     E_neu = zeros(n,1);
+    E = zeros(n,1);
     for i = 1:n
-        r(i,:) = xyz(i,:)-xyz(h,:); % Abstand zu jedem Teilchen k in Zelle aus CellArray
+        r(i,:) = xyz(i,:)-xyz(h,:);
         r_betrag(i) = norm(r(i,2:4));
     end
     for i = 1:n
-        if r_betrag(i) > 2.5*sigma_OO
-            E_neu(i) = 0;
-            continue
-        end
         if r_betrag(i) == 0
             E_neu(i) = 0;
-        elseif xyz(h,1) == q_O && r(i,1) == 0
-            E_neu(i) = a*epsilon_OO*(((sigma_OO.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OO.^12)./((sum(r(i, 2:4).^2,2).^6)))) + skal*q_O^2/r_betrag(i);
-        elseif xyz(h,1) == q_O && r(i,1) ~= 0 || xyz(h,1) == q_H && r(i,1) ~= 0
-            E_neu(i) = a*epsilon_OH*(((sigma_OH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_OH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + skal*q_O*q_H/r_betrag(i);
-        elseif xyz(h,1) == q_H && r(i,1) == 0
-            E_neu(i) = a*epsilon_HH*(((sigma_HH.^6)./(sum(r(i,2:4).^2,2).^3))-((sigma_HH.^12)./((sum(r(i, 2:4).^2,2).^6)))) + skal*q_H^2/r_betrag(i);
+            E(i) = 0;
+        elseif xyz(h,1) == q_O && r(i,1) == 0 % O-O
+            E_neu(i) = a*epsilon_OO*(((sigma_OO.^12)./(sum(r(i,2:4).^2,2).^6))-((sigma_OO.^6)./((sum(r(i, 2:4).^2,2).^3))));
+            E(i) = skal*q_O^2/r_betrag(i);
+        elseif xyz(h,1) == q_O && r(i,1) ~= 0 || xyz(h,1) == q_H && r(i,1) ~= 0 % O-H
+            E_neu(i) = a*epsilon_OH*(((sigma_OH.^12)./(sum(r(i,2:4).^2,2).^6))-((sigma_OH.^6)./((sum(r(i, 2:4).^2,2).^3))));
+            E(i) = skal*q_O*q_H/r_betrag(i);
+        elseif xyz(h,1) == q_H && r(i,1) == 0 % H-H
+            E_neu(i) = a*epsilon_HH*(((sigma_HH.^12)./(sum(r(i,2:4).^2,2).^6))-((sigma_HH.^6)./((sum(r(i, 2:4).^2,2).^3))));
+            E(i) = skal*q_H^2/r_betrag(i);
+        end
+        if r_betrag(i) > 2.5*sigma_OO % Cut-off nur für LJ
+            E_neu(i) = 0;
         end
     end
-    E_kr(h,:) = sum(E_neu, 1);
+    E_LJ(h,:) = sum(E_neu, 1);
+    E_Coulomb(h,:) = sum(E,1);
 end
-E_pot = .5 * sum(E_kr, 1);
-
+V_LJ = .5 * sum(E_LJ, 1);
+V_Coulomb = .5*sum(E_Coulomb,1);
 
 end
 
